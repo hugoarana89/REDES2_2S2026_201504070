@@ -645,24 +645,696 @@ write memory
 exit
 ```
 
+### Configurar modo access a dispositivos finales
+
+**SW1**
+
+```
+enable
+configure terminal
+interface fa0/3
+switchport mode access
+switchport access vlan 10
+exit
+interface fa0/4
+switchport mode access
+switchport access vlan 20
+end
+write memory
+exit
+```
+
+**SW2**
+```
+enable
+configure terminal
+interface fa0/3
+switchport mode access
+switchport access vlan 10
+exit
+interface fa0/4
+switchport mode access
+switchport access vlan 20
+end
+write memory
+exit
+```
+
+
+
+
 ---
 
+## Configuración de EtherChannel (LACP / PAgP)
+
+### Resumen de agrupación — Edificio Izquierdo (LACP)
+
+| Canal | Switches | Puertos MS7 | Puertos MS8 | Puertos MS9 | Channel-group |
+|---|---|---|---|---|---|
+| Po1 | MS7 ↔ MS8 | Gig1/0/1-3 | Gig1/0/4-6 | — | 1 |
+| Po2 | MS7 ↔ MS9 | Gig1/0/4-6 | — | Gig1/0/4-6 | 2 |
+| Po1 (en MS8/MS9) | MS8 ↔ MS9 | — | Gig1/0/1-3 | Gig1/0/1-3 | 1 |
+
+### Comandos — MS7 (LACP, 2 canales)
+
+```
+enable
+configure terminal
+interface range gig1/0/1 - 3
+channel-group 1 mode active
+exit
+interface range gig1/0/4 - 6
+channel-group 2 mode active
+exit
+interface port-channel 1
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+exit
+interface port-channel 2
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+end
+write memory
+exit
+```
+
+### Comandos — MS8 (LACP, 2 canales)
+
+```
+enable
+configure terminal
+interface range gig1/0/1 - 3
+channel-group 2 mode active
+exit
+interface range gig1/0/4 - 6
+channel-group 1 mode active
+exit
+interface port-channel 1
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+exit
+interface port-channel 2
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+end
+write memory
+exit
+```
+
+### Comandos — MS9 (LACP, 2 canales)
+
+```
+enable
+configure terminal
+interface range gig1/0/1 - 3
+channel-group 1 mode active
+exit
+interface range gig1/0/4 - 6
+channel-group 2 mode active
+exit
+interface port-channel 1
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+exit
+interface port-channel 2
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+end
+write memory
+exit
+```
+
+---
+
+### Edificio Derecho (PAgP)
 
 
+| Canal | Switches | Puertos origen | Puertos destino | Channel-group |
+|---|---|---|---|---|
+| Po1 | MS2 ↔ MS3 | Gig1/0/1-3 (MS2) | Gig1/0/1-3 (MS3) | 1 |
+| Po2 | MS3 ↔ MS4 | Gig1/0/4-7 (MS3) | Gig1/0/1-4 (MS4) | 2 en MS3, 1 en MS4 |
+
+### Comandos — MS2 (PAgP)
+
+```
+enable
+configure terminal
+interface range gig1/0/1 - 3
+channel-group 1 mode desirable
+exit
+interface port-channel 1
+switchport mode trunk
+switchport trunk allowed vlan 30,40
+end
+write memory
+exit
+```
+
+### Comandos — MS3 (PAgP, 2 canales)
+
+```
+enable
+configure terminal
+interface range gig1/0/1 - 3
+channel-group 1 mode desirable
+exit
+interface range gig1/0/4 - 7
+channel-group 2 mode desirable
+exit
+interface port-channel 1
+switchport mode trunk
+switchport trunk allowed vlan 30,40
+exit
+interface port-channel 2
+switchport mode trunk
+switchport trunk allowed vlan 30,40
+end
+write memory
+exit
+```
+
+### Comandos — MS4 (PAgP)
+
+```
+enable
+configure terminal
+interface range gig1/0/1 - 4
+channel-group 1 mode desirable
+exit
+interface port-channel 1
+switchport mode trunk
+switchport trunk allowed vlan 30,40
+end
+write memory
+exit
+```
+
+---
+
+**Verificación recomendada tras aplicar todo:**
+```
+show etherchannel summary
+show etherchannel port-channel
+```
+
+---
+
+## Configuración de Spanning Tree Protocol (STP)
+
+Se usará **Rapid PVST+** configurando el switch núcleo de cada edificio como **Root Primary** y otro como **Root Secondary** para dar redundancia. Además, se activa **PortFast** en los puertos que conectan directamente a dispositivos finales, ya que esos puertos no necesitan pasar por los estados de escucha/aprendizaje de STP.
+
+### Asignación de roles STP
+
+| Edificio | VLANs | Root Primary | Root Secondary |
+|---|---|---|---|
+| Izquierdo | 10, 20 | MS7 | MS8 |
+| Derecho | 30, 40 | MS2 | MS3 |
+| Centro | 99 | MS6 | — (única VLAN, un solo switch de origen) |
+
+---
+
+### Edificio Izquierdo
+
+**MS7 (Root Primary VLAN 10, 20)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+spanning-tree vlan 10,20 root primary
+end
+write memory
+exit
+```
+
+**MS8 (Root Secondary VLAN 10, 20)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+spanning-tree vlan 10,20 root secondary
+end
+write memory
+exit
+```
+
+**MS9**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+end
+write memory
+exit
+```
+
+**SW1 (con PortFast en puertos de acceso a PC1, PC2)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+interface range fa0/3 - 4
+spanning-tree portfast
+end
+write memory
+exit
+```
+
+**SW2 (con PortFast en puertos de acceso a Laptop0, Laptop1)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+interface range fa0/3 - 4
+spanning-tree portfast
+end
+write memory
+exit
+```
+
+---
+
+### Edificio Derecho
+
+**MS2 (Root Primary VLAN 30, 40)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+spanning-tree vlan 30,40 root primary
+end
+write memory
+exit
+```
+
+**MS3 (Root Secondary VLAN 30, 40)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+spanning-tree vlan 30,40 root secondary
+end
+write memory
+exit
+```
+
+**MS4**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+end
+write memory
+exit
+```
+
+**MS5**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+end
+write memory
+exit
+```
+
+**SW3 (con PortFast en puertos de acceso a Laptop2, PC3)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+interface range fa0/2 - 3
+spanning-tree portfast
+end
+write memory
+exit
+```
+
+**SW4 (con PortFast en puertos de acceso a Laptop3, PC4)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+interface range fa0/2 - 3
+spanning-tree portfast
+end
+write memory
+exit
+```
+
+---
+
+### Centro
+
+**MS6 (Root Primary VLAN 99, PortFast hacia PC0)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+spanning-tree vlan 99 root primary
+interface gig1/0/1
+spanning-tree portfast
+end
+write memory
+exit
+```
+
+**MS1 (PortFast hacia los servidores DHCP)**
+```
+enable
+configure terminal
+spanning-tree mode rapid-pvst
+interface range gig1/0/1 - 2
+spanning-tree portfast
+end
+write memory
+exit
+```
+
+---
+
+**Verificación de configuración:**
+```
+show spanning-tree summary
+show spanning-tree vlan 10
+```
+
+---
+
+## SVIs + OSPF (inter-VLAN y entre edificios)
+
+### Resumen de interfaces routeadas (enlaces de fibra, `10.4.70.0/24`)
+
+| Switch | Interfaz | IP | Enlace hacia |
+|---|---|---|---|
+| MS1 | Gig1/1/1 | 10.4.70.1/30 | MS2 |
+| MS1 | Gig1/1/2 | 10.4.70.5/30 | MS7 |
+| MS2 | Gig1/1/1 | 10.4.70.2/30 | MS1 |
+| MS2 | Gig1/1/2 | 10.4.70.9/30 | MS6 |
+| MS2 | Gig1/1/3 | 10.4.70.13/30 | MS7 |
+| MS6 | Gig1/1/1 | 10.4.70.17/30 | MS7 |
+| MS6 | Gig1/1/2 | 10.4.70.10/30 | MS2 |
+| MS7 | Gig1/1/1 | 10.4.70.18/30 | MS6 |
+| MS7 | Gig1/1/2 | 10.4.70.6/30 | MS1 |
+| MS7 | Gig1/1/3 | 10.4.70.14/30 | MS2 |
+
+### Resumen de SVIs (gateways de VLAN, `192.188.70.0/24`)
+
+| Switch | VLAN | SVI IP |
+|---|---|---|
+| MS7 | 10 | 192.188.70.1/29 |
+| MS7 | 20 | 192.188.70.9/29 |
+| MS2 | 30 | 192.188.70.17/29 |
+| MS2 | 40 | 192.188.70.25/29 |
+ | MS6 | 99 | 192.188.70.33/29 |
+
+---
+
+### MS1 (solo tránsito, sin VLANs propias)
+
+```
+enable
+configure terminal
+ip routing
+interface gig1/1/1
+no switchport
+ip address 10.4.70.1 255.255.255.252
+exit
+interface gig1/1/2
+no switchport
+ip address 10.4.70.5 255.255.255.252
+exit
+router ospf 1
+network 10.4.70.0 0.0.0.3 area 0
+network 10.4.70.4 0.0.0.3 area 0
+end
+write memory
+exit
+```
+
+---
+
+### MS7 (Edificio Izquierdo — SVIs 10, 20)
+
+```
+enable
+configure terminal
+ip routing
+interface vlan 10
+ip address 192.188.70.1 255.255.255.248
+exit
+interface vlan 20
+ip address 192.188.70.9 255.255.255.248
+exit
+interface gig1/1/1
+no switchport
+ip address 10.4.70.18 255.255.255.252
+exit
+interface gig1/1/2
+no switchport
+ip address 10.4.70.6 255.255.255.252
+exit
+interface gig1/1/3
+no switchport
+ip address 10.4.70.14 255.255.255.252
+exit
+router ospf 1
+network 10.4.70.4 0.0.0.3 area 0
+network 10.4.70.12 0.0.0.3 area 0
+network 10.4.70.16 0.0.0.3 area 0
+network 192.188.70.0 0.0.0.7 area 0
+network 192.188.70.8 0.0.0.7 area 0
+passive-interface vlan 10
+passive-interface vlan 20
+end
+write memory
+exit
+```
+
+---
+
+### MS2 (Edificio Derecho — SVIs 30, 40)
+
+```
+enable
+configure terminal
+ip routing
+interface vlan 30
+ip address 192.188.70.17 255.255.255.248
+exit
+interface vlan 40
+ip address 192.188.70.25 255.255.255.248
+exit
+interface gig1/1/1
+no switchport
+ip address 10.4.70.2 255.255.255.252
+exit
+interface gig1/1/2
+no switchport
+ip address 10.4.70.9 255.255.255.252
+exit
+interface gig1/1/3
+no switchport
+ip address 10.4.70.13 255.255.255.252
+exit
+router ospf 1
+network 10.4.70.0 0.0.0.3 area 0
+network 10.4.70.8 0.0.0.3 area 0
+network 10.4.70.12 0.0.0.3 area 0
+network 192.188.70.16 0.0.0.7 area 0
+network 192.188.70.24 0.0.0.7 area 0
+passive-interface vlan 30
+passive-interface vlan 40
+end
+write memory
+exit
+```
+
+---
+
+### MS6 (Centro — SVI 99)
+
+```
+enable
+configure terminal
+ip routing
+interface vlan 99
+ip address 192.188.70.33 255.255.255.248
+exit
+interface gig1/1/1
+no switchport
+ip address 10.4.70.17 255.255.255.252
+exit
+interface gig1/1/2
+no switchport
+ip address 10.4.70.10 255.255.255.252
+exit
+router ospf 1
+network 10.4.70.8 0.0.0.3 area 0
+network 10.4.70.16 0.0.0.3 area 0
+network 192.188.70.32 0.0.0.7 area 0
+passive-interface vlan 99
+end
+write memory
+exit
+```
+
+```
+enable
+configure terminal
+interface gigabitEthernet1/0/1
+switchport mode access
+switchport access vlan 99
+exit
+interface vlan99
+ip address 192.188.70.33 255.255.255.248
+ip helper-address 10.4.70.22
+no shutdown
+end
+write memory
+exit
+```
+
+---
+
+**Notas:**
+- `passive-interface` en las SVIs evita que OSPF envíe *hellos* hacia los hosts finales.
+- Los switches MS8, MS9 (Izquierdo), MS3, MS4, MS5 (Derecho) **no necesitan** `ip routing` ni SVIs, ya que solo transportan las VLANs por trunk/EtherChannel hacia MS7 o MS2, que son los únicos con función de Capa 3 en su edificio.
+
+**Verificación de configuración:**
+```
+show ip route
+show ip ospf neighbor
+show ip interface brief
+```
+
+---
+
+## Servidores DHCP + DHCP Relay
+
+### Subred de gestión para los servidores DHCP (pendiente desde el Paso 7)
 
 
+| Enlace | Red / Prefijo | IP MS1 | IP Servidor |
+|---|---|---|---|
+| MS1 (Gig1/0/1) – DHCP1 | 10.4.70.20/30 | 10.4.70.21 | 10.4.70.22 |
+| MS1 (Gig1/0/2) – DHCP2 | 10.4.70.24/30 | 10.4.70.25 | 10.4.70.26 |
 
+---
 
+### Configuración de MS1 (interfaces hacia los servidores + OSPF actualizado)
 
+```
+enable
+configure terminal
+interface gig1/0/1
+no switchport
+ip address 10.4.70.21 255.255.255.252
+exit
+interface gig1/0/2
+no switchport
+ip address 10.4.70.25 255.255.255.252
+exit
+router ospf 1
+network 10.4.70.0 0.0.0.3 area 0
+network 10.4.70.4 0.0.0.3 area 0
+network 10.4.70.20 0.0.0.3 area 0
+network 10.4.70.24 0.0.0.3 area 0
+end
+write memory
+exit
+```
 
+---
 
+### Configuración de los servidores (interfaz gráfica de Packet Tracer)
 
+**DHCP1** — pestaña *Desktop → IP Configuration*:
+```
+IP Address: 10.4.70.22
+Subnet Mask: 255.255.255.252
+Default Gateway: 10.4.70.21
+```
 
+**DHCP1** — pestaña *Services → DHCP*, un pool por VLAN que sirve:
 
+| Pool | Red | Máscara | Gateway por defecto | Rango IP inicio | Cantidad máx. |
+|---|---|---|---|---|---|
+| VLAN10 | 192.188.70.0 | 255.255.255.248 | 192.188.70.1 | 192.188.70.2 | 5 |
+| VLAN20 | 192.188.70.8 | 255.255.255.248 | 192.188.70.9 | 192.188.70.10 | 5 |
+| VLAN99 | 192.188.70.32 | 255.255.255.248 | 192.188.70.33 | 192.188.70.34 | 5 |
 
+---
 
+**DHCP2** — pestaña *Desktop → IP Configuration*:
+```
+IP Address: 10.4.70.26
+Subnet Mask: 255.255.255.252
+Default Gateway: 10.4.70.25
+```
 
+**DHCP2** — pestaña *Services → DHCP*:
 
+| Pool | Red | Máscara | Gateway por defecto | Rango IP inicio | Cantidad máx. |
+|---|---|---|---|---|---|
+| VLAN30 | 192.188.70.16 | 255.255.255.248 | 192.188.70.17 | 192.188.70.18 | 5 |
+| VLAN40 | 192.188.70.24 | 255.255.255.248 | 192.188.70.25 | 192.188.70.26 | 5 |
 
+> En cada pool se debe desmarcar/excluir la IP del gateway si Packet Tracer no lo hace automáticamente, para que no se asigne a un cliente por error.
 
+---
 
+### DHCP Relay (`ip helper-address`) en las SVIs
+
+Se aplica en la SVI de cada VLAN, apuntando hacia el servidor DHCP que la atiende:
+
+**MS7 (VLAN 10, 20 → DHCP1)**
+```
+enable
+configure terminal
+interface vlan 10
+ip helper-address 10.4.70.22
+exit
+interface vlan 20
+ip helper-address 10.4.70.22
+end
+write memory
+exit
+```
+
+**MS2 (VLAN 30, 40 → DHCP2)**
+```
+enable
+configure terminal
+interface vlan 30
+ip helper-address 10.4.70.26
+exit
+interface vlan 40
+ip helper-address 10.4.70.26
+end
+write memory
+exit
+```
+
+**MS6 (VLAN 99 → DHCP1)**
+```
+enable
+configure terminal
+interface vlan 99
+ip helper-address 10.4.70.22
+end
+write memory
+exit
+```
+
+---
+
+### Configuración de los clientes finales
+
+Cada PC/Laptop se configuró su modo de IP en **DHCP** (no estático), desde *Desktop → IP Configuration → DHCP*, en todos los dispositivos: PC0, PC1, PC2, PC3, PC4, Laptop0, Laptop1, Laptop2, Laptop3.
+
+**Verificación de configuración:**
+```
+show ip dhcp binding    (en los servidores, si aplica)
+show ip interface brief (en MS7, MS2, MS6, para confirmar helper-address activo)
+```
+> En cada PC/Laptop, `ipconfig` desde su terminal debe mostrar una IP dentro del rango de su VLAN correspondiente.
