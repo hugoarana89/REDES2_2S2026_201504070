@@ -15,17 +15,24 @@
 | HUGO JORGE LUIS PÉREZ ARANA               | 201504070 |
 
 
-# Capturas de la topología completa
+## Capturas de la topología completa
 
 <div align="center">
-  <img src="img/Topologia_sin_etiquetas.png" alt="" width="100%">
+  <img src="img/Topologia_completa.jpg" alt="" width="100%">
 </div>
 
-# Topología etiquetando los tipos de interfaces y medios de transmisión.
+## Topología etiquetando los tipos de interfaces y medios de transmisión.
 
 <div align="center">
-  <img src="img/Topologia_sin_etiquetas.png" alt="" width="100%">
+  <img src="img/Topologia_etiquetas.jpg" alt="" width="100%">
 </div>
+
+## Topología etiquetando puertos.
+
+<div align="center">
+  <img src="img/Topologia_puertos.jpg" alt="" width="100%">
+</div>
+
 
 ## Conexiones
 
@@ -680,7 +687,37 @@ write memory
 exit
 ```
 
+**SW3**
+```
+enable
+configure terminal
+interface fa0/2
+switchport mode access
+switchport access vlan 40
+exit
+interface fa0/3
+switchport mode access
+switchport access vlan 30
+end
+write memory
+exit
+```
 
+**SW4**
+```
+enable
+configure terminal
+interface fa0/2
+switchport mode access
+switchport access vlan 40
+exit
+interface fa0/3
+switchport mode access
+switchport access vlan 30
+end
+write memory
+exit
+```
 
 
 ---
@@ -1338,3 +1375,133 @@ show ip dhcp binding    (en los servidores, si aplica)
 show ip interface brief (en MS7, MS2, MS6, para confirmar helper-address activo)
 ```
 > En cada PC/Laptop, `ipconfig` desde su terminal debe mostrar una IP dentro del rango de su VLAN correspondiente.
+
+
+## Configuración de ACLs (Naranja / Verde / ADMIN)
+
+### Diseño de la política
+
+| VLAN | Subred | Puede comunicarse con | Bloqueada hacia |
+|---|---|---|---|
+| Naranja-IZQ (10) | 192.188.70.0/29 | Naranja-DER (30) | Verde-IZQ, Verde-DER, ADMIN |
+| Naranja-DER (30) | 192.188.70.16/29 | Naranja-IZQ (10) | Verde-IZQ, Verde-DER, ADMIN |
+| Verde-IZQ (20) | 192.188.70.8/29 | Verde-DER (40) | Naranja-IZQ, Naranja-DER, ADMIN |
+| Verde-DER (40) | 192.188.70.24/29 | Verde-IZQ (20) | Naranja-IZQ, Naranja-DER, ADMIN |
+| ADMIN (99) | 192.188.70.32/29 | Todas (sin restricción) | — |
+
+---
+
+### MS7 (Edificio Izquierdo — VLAN 10 y 20)
+
+```
+enable
+configure terminal
+ip access-list extended NARANJA_IZQ_ACL
+remark Permite comunicacion con VLAN Naranja Edificio Derecho
+permit ip 192.188.70.0 0.0.0.7 192.188.70.16 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Izquierdo
+deny ip 192.188.70.0 0.0.0.7 192.188.70.8 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Derecho
+deny ip 192.188.70.0 0.0.0.7 192.188.70.24 0.0.0.7
+remark Bloquea comunicacion hacia VLAN ADMIN (trafico unidireccional)
+deny ip 192.188.70.0 0.0.0.7 192.188.70.32 0.0.0.7
+remark Permite el resto del trafico (DHCP, servicios generales)
+permit ip any any
+exit
+ip access-list extended VERDE_IZQ_ACL
+remark Permite comunicacion con VLAN Verde Edificio Derecho
+permit ip 192.188.70.8 0.0.0.7 192.188.70.24 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Izquierdo
+deny ip 192.188.70.8 0.0.0.7 192.188.70.0 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Derecho
+deny ip 192.188.70.8 0.0.0.7 192.188.70.16 0.0.0.7
+remark Bloquea comunicacion hacia VLAN ADMIN (trafico unidireccional)
+deny ip 192.188.70.8 0.0.0.7 192.188.70.32 0.0.0.7
+remark Permite el resto del trafico (DHCP, servicios generales)
+permit ip any any
+exit
+interface vlan10
+ip access-group NARANJA_IZQ_ACL in
+exit
+interface vlan20
+ip access-group VERDE_IZQ_ACL in
+end
+write memory
+exit
+```
+
+---
+
+### MS2 (Edificio Derecho — VLAN 30 y 40)
+
+```
+enable
+configure terminal
+ip access-list extended NARANJA_DER_ACL
+remark Permite comunicacion con VLAN Naranja Edificio Izquierdo
+permit ip 192.188.70.16 0.0.0.7 192.188.70.0 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Izquierdo
+deny ip 192.188.70.16 0.0.0.7 192.188.70.8 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Derecho
+deny ip 192.188.70.16 0.0.0.7 192.188.70.24 0.0.0.7
+remark Bloquea comunicacion hacia VLAN ADMIN (trafico unidireccional)
+deny ip 192.188.70.16 0.0.0.7 192.188.70.32 0.0.0.7
+remark Permite el resto del trafico (DHCP, servicios generales)
+permit ip any any
+exit
+ip access-list extended VERDE_DER_ACL
+remark Permite comunicacion con VLAN Verde Edificio Izquierdo
+permit ip 192.188.70.24 0.0.0.7 192.188.70.8 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Izquierdo
+deny ip 192.188.70.24 0.0.0.7 192.188.70.0 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Derecho
+deny ip 192.188.70.24 0.0.0.7 192.188.70.16 0.0.0.7
+remark Bloquea comunicacion hacia VLAN ADMIN (trafico unidireccional)
+deny ip 192.188.70.24 0.0.0.7 192.188.70.32 0.0.0.7
+remark Permite el resto del trafico (DHCP, servicios generales)
+permit ip any any
+exit
+interface vlan30
+ip access-group NARANJA_DER_ACL in
+exit
+interface vlan40
+ip access-group VERDE_DER_ACL in
+end
+write memory
+exit
+```
+
+---
+
+### MS6 (Centro — VLAN 99 ADMIN)
+
+No requiere ACL de salida ya que ADMIN tiene acceso completo a todas las VLANs por diseño. Se documenta explícitamente para dejar constancia de la decisión:
+
+```
+enable
+configure terminal
+ip access-list extended ADMIN_ACL
+remark VLAN ADMIN tiene acceso completo, sin restricciones de salida
+permit ip any any
+exit
+interface vlan99
+ip access-group ADMIN_ACL in
+end
+write memory
+exit
+```
+
+---
+
+### Verificación de configuración
+
+```
+show access-lists
+show ip interface vlan10
+show ip interface vlan20
+show ip interface vlan30
+show ip interface vlan40
+```
+
+---
+
