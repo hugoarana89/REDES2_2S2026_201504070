@@ -1607,12 +1607,76 @@ En cuanto a la VLAN Administrador y su dispositivo final "PC0" se ha configurado
 </div>
 
 
+### Prueba de tolerancia a fallos con edificio izquierdo LACP
+
+1. Se Inició un ping continuo y prolongado entre dos hosts `ping -t 192.188.70.17` desde PC1 hacia el gateway de VLAN 30, atravesando MS7-MS8/MS9.
+
+<div align="center">
+  <img src="img/ping-continuo.jpg" alt="" width="100%">
+</div>
+
+2. Mientras el ping corría, se desconectó físicamente uno de los 3 enlaces de un EtherChannel LACP que fue el MS7-MS8.
+
+<div align="center">
+  <img src="img/desconeccion.jpg" alt="" width="100%">
+</div>
+
+3. Se verificó que el ping **no pierde paquetes** mientras STP/LACP recalculan.
+
+<div align="center">
+  <img src="img/sin-perdida.jpg" alt="" width="100%">
+</div>
+
+4. Se ejecutó `show etherchannel summary` y se confirmó que el canal sigue en estado `SU` pero con un puerto menos (2 de 3 activos).
+
+<div align="center">
+  <img src="img/summary1.jpg" alt="" width="100%">
+  <p>El puerto Gig1/0/6 aparece con la letra (D) lo que significa que esta borrado.</p>
+</div>
+
+5. Se Reconectó el cable y se confirmó que el puerto se reincorpora automáticamente al canal.
+
+<div align="center">
+  <img src="img/summary1_restaurado.jpg" alt="" width="100%">
+  <p>El puerto Gig1/0/6 aparece con la letra (P) lo que significa que esta restaurado.</p>
+</div>
 
 
+### Prueba de tolerancia a fallos — Edificio Derecho (PAgP)
 
+1. Se inició un ping continuo y prolongado entre dos hosts, `ping -t 192.188.70.2`, desde PC3 hacia PC1, atravesando el canal PAgP entre MS3 y MS4.
 
+<div align="center">
+  <img src="img/ping-continuo2.jpg" alt="" width="100%">
+</div>
 
+2. Mientras el ping corría, se desconectó físicamente uno de los 4 enlaces del EtherChannel PAgP entre MS3 y MS4.
 
+<div align="center">
+  <img src="img/desconeccion2.jpg" alt="" width="100%">
+</div>
+
+3. Se verificó que el ping **no perdió paquetes** mientras PAgP recalculaba el balanceo de carga del canal.
+
+<div align="center">
+  <img src="img/sin-perdida2.jpg" alt="" width="100%">
+</div>
+
+4. Se ejecutó `show etherchannel summary` y se confirmó que el canal sigue en estado `SU`, pero con un puerto menos (3 de 4 activos).
+
+<div align="center">
+  <img src="img/summary2.jpg" alt="" width="100%">
+  <p>El puerto Gig1/0/4 aparece con la letra (D), lo que significa que está <em>down</em> (inactivo), al haberse desconectado el cable.</p>
+</div>
+
+5. Se reconectó el cable y se confirmó que el puerto se reincorporó automáticamente al canal.
+
+<div align="center">
+  <img src="img/summary2_restaurado.jpg" alt="" width="100%">
+  <p>El puerto Gig1/0/4 aparece nuevamente con la letra (P), lo que significa que está agrupado en el <em>port-channel</em> (<em>in port-channel</em>), confirmando su reincorporación.</p>
+</div>
+
+---
 
 
 
