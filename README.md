@@ -1491,6 +1491,95 @@ write memory
 exit
 ```
 
+
+### MS7 (VLAN 10 y 20) — ACLs corregidas
+
+```
+enable
+configure terminal
+no ip access-list extended NARANJA_IZQ_ACL
+ip access-list extended NARANJA_IZQ_ACL
+remark Permite comunicacion con VLAN Naranja Edificio Derecho
+permit ip 192.188.70.0 0.0.0.7 192.188.70.16 0.0.0.7
+remark Permite respuestas ICMP a pings iniciados por ADMIN
+permit icmp 192.188.70.0 0.0.0.7 192.188.70.32 0.0.0.7 echo-reply
+remark Bloquea que esta VLAN inicie ping hacia ADMIN
+deny icmp 192.188.70.0 0.0.0.7 192.188.70.32 0.0.0.7 echo
+remark Bloquea cualquier otro trafico iniciado hacia ADMIN
+deny ip 192.188.70.0 0.0.0.7 192.188.70.32 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Izquierdo
+deny ip 192.188.70.0 0.0.0.7 192.188.70.8 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Derecho
+deny ip 192.188.70.0 0.0.0.7 192.188.70.24 0.0.0.7
+remark Permite el resto del trafico
+permit ip any any
+exit
+no ip access-list extended VERDE_IZQ_ACL
+ip access-list extended VERDE_IZQ_ACL
+remark Permite comunicacion con VLAN Verde Edificio Derecho
+permit ip 192.188.70.8 0.0.0.7 192.188.70.24 0.0.0.7
+remark Permite respuestas ICMP a pings iniciados por ADMIN
+permit icmp 192.188.70.8 0.0.0.7 192.188.70.32 0.0.0.7 echo-reply
+remark Bloquea que esta VLAN inicie ping hacia ADMIN
+deny icmp 192.188.70.8 0.0.0.7 192.188.70.32 0.0.0.7 echo
+remark Bloquea cualquier otro trafico iniciado hacia ADMIN
+deny ip 192.188.70.8 0.0.0.7 192.188.70.32 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Izquierdo
+deny ip 192.188.70.8 0.0.0.7 192.188.70.0 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Derecho
+deny ip 192.188.70.8 0.0.0.7 192.188.70.16 0.0.0.7
+remark Permite el resto del trafico
+permit ip any any
+exit
+end
+write memory
+exit
+```
+
+### MS2 (VLAN 30 y 40) — ACLs corregidas
+
+```
+enable
+configure terminal
+no ip access-list extended NARANJA_DER_ACL
+ip access-list extended NARANJA_DER_ACL
+remark Permite comunicacion con VLAN Naranja Edificio Izquierdo
+permit ip 192.188.70.16 0.0.0.7 192.188.70.0 0.0.0.7
+remark Permite respuestas ICMP a pings iniciados por ADMIN
+permit icmp 192.188.70.16 0.0.0.7 192.188.70.32 0.0.0.7 echo-reply
+remark Bloquea que esta VLAN inicie ping hacia ADMIN
+deny icmp 192.188.70.16 0.0.0.7 192.188.70.32 0.0.0.7 echo
+remark Bloquea cualquier otro trafico iniciado hacia ADMIN
+deny ip 192.188.70.16 0.0.0.7 192.188.70.32 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Izquierdo
+deny ip 192.188.70.16 0.0.0.7 192.188.70.8 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Verde Derecho
+deny ip 192.188.70.16 0.0.0.7 192.188.70.24 0.0.0.7
+remark Permite el resto del trafico
+permit ip any any
+exit
+no ip access-list extended VERDE_DER_ACL
+ip access-list extended VERDE_DER_ACL
+remark Permite comunicacion con VLAN Verde Edificio Izquierdo
+permit ip 192.188.70.24 0.0.0.7 192.188.70.8 0.0.0.7
+remark Permite respuestas ICMP a pings iniciados por ADMIN
+permit icmp 192.188.70.24 0.0.0.7 192.188.70.32 0.0.0.7 echo-reply
+remark Bloquea que esta VLAN inicie ping hacia ADMIN
+deny icmp 192.188.70.24 0.0.0.7 192.188.70.32 0.0.0.7 echo
+remark Bloquea cualquier otro trafico iniciado hacia ADMIN
+deny ip 192.188.70.24 0.0.0.7 192.188.70.32 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Izquierdo
+deny ip 192.188.70.24 0.0.0.7 192.188.70.0 0.0.0.7
+remark Bloquea comunicacion hacia VLAN Naranja Derecho
+deny ip 192.188.70.24 0.0.0.7 192.188.70.16 0.0.0.7
+remark Permite el resto del trafico
+permit ip any any
+exit
+end
+write memory
+exit
+```
+
 ---
 
 ### Verificación de configuración
@@ -1504,4 +1593,34 @@ show ip interface vlan40
 ```
 
 ---
+
+## Pruebas de funcionalidad
+
+### Pruebas de Pings
+
+En la siguiente imagen se puede observar como al hacer pings entre mismas VLANS es exitoso con resultado "Success" mientras que al hacer ping entre distintas VLANS falla con el resultado "failed". 
+
+En cuanto a la VLAN Administrador y su dispositivo final "PC0" se ha configurado correctamente ya que al hacer ping de cualquier dispositivo final hacia "PC0" falla pero al hacer ping desde "PC0" hacia cualquier dispositivo final, el ping es exitoso.
+
+<div align="center">
+  <img src="img/ping.jpg" alt="" width="100%">
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
