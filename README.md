@@ -41,7 +41,7 @@ Los enunciados originales están en PDF: [Proyecto 1](Proyecto1/%5BRC2%5DProyect
 Diseño e implementación de una **red corporativa en dos edificios** (izquierdo y derecho) más un nodo central, unidos por una red MAN de fibra. El edificio izquierdo sigue una arquitectura jerárquica de tres capas.
 
 <div align="center">
-  <img src="img/topologia_completa.jpg" alt="Topología completa de Chapin Red" width="90%">
+  <img src="Proyecto1/img/topologia_etiquetas.jpg" alt="Topología completa de Chapin Red" width="90%">
 </div>
 
 **Qué incluye**
@@ -58,8 +58,8 @@ Diseño e implementación de una **red corporativa en dos edificios** (izquierdo
 - **Pruebas:** pings entre áreas y pruebas de tolerancia a fallos en los enlaces LACP y PAgP.
 
 <div align="center">
-  <img src="img/topologia_etiquetas.jpg" alt="Topología con tipos de interfaces y medios" width="45%">
-  <img src="img/topologia_puertos.jpg" alt="Topología con puertos" width="45%">
+  <img src="Proyecto1/img/topologia_etiquetas.jpg" alt="Topología con tipos de interfaces y medios" width="45%">
+  <img src="Proyecto1/img/topologia_puertos.jpg" alt="Topología con puertos" width="45%">
 </div>
 
 Toda la configuración, las tablas y las capturas están en el [README del Proyecto 1](Proyecto1/README.md).
