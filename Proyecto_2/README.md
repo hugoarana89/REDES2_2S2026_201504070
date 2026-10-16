@@ -963,5 +963,236 @@ Resultado esperado:
 |:--|:--|
 | `show etherchannel summary` | `Po1` y `Po2` en `SU`, y cada puerto miembro con la marca `P` |
 | `show interfaces trunk` | `Po1` permite solo la VLAN 101 y `Po2` solo la VLAN 102 |
-| `show ip interface brief` | `Vlan101` y `Vlan102` en `up/down` o `up/up` según el extremo, y los puertos enrutados con su IP |
+| `show ip interface brief` | `Vlan101` y `Vlan102` en `up/up` según el extremo, y los puertos enrutados con su IP |
 | Pings | Responden (el primer paquete puede perderse por el ARP) |
+
+
+## Fase 2 · SVIs gateway y OSPF en FibraNet GT
+
+`FIB-ACC1` y `FIB-ACC2` actúan como gateways de los dos departamentos con una SVI cada uno. Los cinco switches de FibraNet GT forman el área 0 de OSPF; los enlaces de fibra hacia los otros ISP no participan en OSPF, porque se manejan con eBGP. Las SVIs de usuario se declaran pasivas.
+
+FIB-ACC1:
+```
+enable
+configure terminal
+interface vlan 10
+ ip address 172.16.10.1 255.255.255.128
+ no shutdown
+ exit
+!
+router ospf 1
+ router-id 1.1.1.4
+ passive-interface vlan 10
+ network 192.168.70.24 0.0.0.3 area 0
+ network 172.16.10.0 0.0.0.127 area 0
+ end
+write memory
+```
+
+FIB-ACC2:
+```
+enable
+configure terminal
+interface vlan 20
+ ip address 172.16.10.129 255.255.255.128
+ no shutdown
+ exit
+!
+router ospf 1
+ router-id 1.1.1.5
+ passive-interface vlan 20
+ network 192.168.70.28 0.0.0.3 area 0
+ network 172.16.10.128 0.0.0.127 area 0
+ end
+write memory
+```
+
+FIB-DIST1:
+```
+enable
+configure terminal
+router ospf 1
+ router-id 1.1.1.2
+ network 192.168.70.16 0.0.0.3 area 0
+ network 192.168.70.24 0.0.0.3 area 0
+ end
+write memory
+```
+
+FIB-DIST2:
+```
+enable
+configure terminal
+router ospf 1
+ router-id 1.1.1.3
+ network 192.168.70.20 0.0.0.3 area 0
+ network 192.168.70.28 0.0.0.3 area 0
+ end
+write memory
+```
+
+FIB-CORE:
+```
+enable
+configure terminal
+router ospf 1
+ router-id 1.1.1.1
+ network 192.168.70.16 0.0.0.3 area 0
+ network 192.168.70.20 0.0.0.3 area 0
+ end
+write memory
+```
+
+## Verificación de la fase 2 · FibraNet GT
+
+FIB-CORE:
+```
+show ip ospf neighbor
+show ip route ospf
+ping 172.16.10.1
+ping 172.16.10.129
+```
+
+FIB-ACC1:
+```
+show ip interface brief | include Vlan
+ping 172.16.10.129
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show ip ospf neighbor` en `FIB-CORE` | Dos vecinos en `FULL`: `FIB-DIST1` y `FIB-DIST2` |
+| `show ip route ospf` en `FIB-CORE` | Rutas `172.16.10.0/25` y `172.16.10.128/25` aprendidas por OSPF |
+| `Vlan10` y `Vlan20` | En `up/up` |
+| Pings entre gateways | Responden (el primer paquete puede perderse por el ARP) |
+
+## Fase 3 · Configuración de IP estática en FIB-SRV
+
+El servidor `FIB-SRV` se configura desde la interfaz gráfica de Packet Tracer. Se hace clic sobre el servidor, se abre la pestaña **Config** y se entra a **FastEthernet0**, en la sección **INTERFACE**.
+
+| Parámetro | Valor |
+|:--|:--|
+| IP Configuration | Static |
+| IPv4 Address | `172.16.10.125` |
+| Subnet Mask | `255.255.255.128` |
+
+Después se abre **GLOBAL**, **Settings**, y se completan los datos de red del servidor:
+
+| Parámetro | Valor |
+|:--|:--|
+| Gateway/DNS IPv4 | Static |
+| Default Gateway | `172.16.10.1` |
+| DNS Server | `172.16.10.125` |
+
+El servidor usa su propia dirección como servidor DNS, porque es el equipo que resuelve el dominio. El mismo resultado se obtiene desde **Desktop**, **IP Configuration**.
+
+---
+
+## Fase 3 · Configuración del servicio DNS
+
+En la pestaña **Services** del servidor se selecciona **DNS** y se registra el dominio del proyecto.
+
+| Parámetro | Valor |
+|:--|:--|
+| DNS Service | On |
+| Name | `www.proyecto2_201504070.com` |
+| Type | A Record |
+| Address | `172.16.10.125` |
+
+Se pulsa **Add** y el registro debe aparecer en la lista de la parte inferior.
+
+---
+
+## Fase 3 · Configuración de los servicios HTTP y HTTPS
+
+En la pestaña **Services** se selecciona **HTTP** y se activan ambos protocolos.
+
+| Parámetro | Valor |
+|:--|:--|
+| HTTP | On |
+| HTTPS | On |
+
+En la lista de archivos del mismo panel se abre `index.html` con el enlace **(edit)**. Se borra el contenido y se pega el siguiente, que muestra los datos del estudiante y la información básica del curso, y después se pulsa **Save**.
+
+```
+<html>
+<head>
+<title>Proyecto Conectividad XXI</title>
+</head>
+<body>
+<h1>Proyecto Conectividad XXI</h1>
+<h2>Integraci&oacute;n de Operadores Nacionales</h2>
+<hr>
+<h3>Datos del estudiante</h3>
+<p>Nombre: Hugo Jorge Luis P&eacute;rez Arana</p>
+<p>Carn&eacute;: 201504070</p>
+<p>Carrera: Ingenier&iacute;a en Ciencias y Sistemas</p>
+<p>Universidad de San Carlos de Guatemala, Facultad de Ingenier&iacute;a</p>
+<h3>Informaci&oacute;n del curso</h3>
+<p>Curso: Redes de Computadoras 2</p>
+<p>Secci&oacute;n: N</p>
+<p>Semestre: Segundo semestre de 2026</p>
+<p>Catedr&aacute;tico: Ing. Allan Alberto Morataya G&oacute;mez</p>
+<p>Auxiliar: Dominic Juan Pablo Ruano P&eacute;rez</p>
+<p>Proyecto 2: tres ISP (FibraNet GT, AndinaCom y MoonLink) interconectados con BGP.</p>
+<p>Servidor: FIB-SRV (FibraNet GT)</p>
+</body>
+</html>
+```
+
+Las letras con tilde se escriben como entidades HTML (`&oacute;`, `&eacute;`), porque el navegador de Packet Tracer no siempre muestra bien los caracteres con acento.
+
+---
+
+## Fase 3 · Preparación de los PCs de prueba
+
+Como DHCP todavía no funciona entre ISPs, se usan dos PCs de FibraNet con una IP estática temporal. Las direcciones se eligen fuera de los pools de DHCP, o dentro del rango que se revierte después. En cada PC se abre **Desktop**, **IP Configuration**, y se selecciona **Static**.
+
+| PC | IPv4 Address | Subnet Mask | Default Gateway | DNS Server |
+|:--|:--|:--|:--|:--|
+| `FIB-PC1` (VLAN 10) | `172.16.10.120` | `255.255.255.128` | `172.16.10.1` | `172.16.10.125` |
+| `FIB-PC4` (VLAN 20) | `172.16.10.250` | `255.255.255.128` | `172.16.10.129` | `172.16.10.125` |
+
+Estas direcciones son solo para la prueba, y los dos PCs deben volver a **DHCP** al terminar la fase 10, porque el proyecto no se califica con direccionamiento estático.
+
+---
+
+## Verificación de la fase 3 · FibraNet GT
+
+En `FIB-PC1`, en **Desktop**, **Command Prompt**:
+
+```
+ping 172.16.10.125
+nslookup www.proyecto2_201504070.com
+```
+
+En `FIB-PC4`, en **Desktop**, **Command Prompt**:
+
+```
+ping 172.16.10.125
+nslookup www.proyecto2_201504070.com
+```
+
+Después, en **Desktop**, **Web Browser** de cada uno de los dos PCs, se abren estas direcciones:
+
+```
+http://www.proyecto2_201504070.com
+https://www.proyecto2_201504070.com
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `ping 172.16.10.125` desde `FIB-PC1` | Responde (el primer paquete puede perderse por el ARP) |
+| `ping 172.16.10.125` desde `FIB-PC4` | Responde, lo que confirma el enrutamiento OSPF entre las dos VLAN |
+| `nslookup` | Devuelve `172.16.10.125` para `www.proyecto2_201504070.com` |
+| Navegador con `http://` | Muestra la página con los datos del estudiante |
+| Navegador con `https://` | Muestra la misma página |
+
+Si el navegador no abre el dominio pero el `nslookup` devuelve la IP correcta, el problema está en el navegador y no en la red, porque el guion bajo del dominio puede no gustarle. En ese caso se prueba con `http://172.16.10.125` para confirmar que el servicio web funciona.
+
+---
+
