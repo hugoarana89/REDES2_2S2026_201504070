@@ -43,6 +43,16 @@ El proyecto consiste en diseñar e implementar una infraestructura nacional de t
 
 Todo se implementa en Cisco Packet Tracer (archivo `Proyecto2_201504070.pkt`) y todas las configuraciones se aplican desde la CLI, excepto en el router inalámbrico, que solo ofrece interfaz gráfica.
 
+## Estado del proyecto
+
+| Etapa | Estado |
+|:--|:--|
+| Diseño, subneteo y plan de direccionamiento | Terminado |
+| Cableado físico en Packet Tracer (39 cables, módulos de fibra instalados) | Terminado |
+| Configuración de dispositivos | Pendiente (se hará por fases, ver [Plan de configuración](#plan-de-configuración)) |
+| Servicios, ACLs y pruebas | Pendiente |
+| Wireshark, manual técnico y presentación | Pendiente |
+
 ---
 
 ## Subneteo y plan de direccionamiento
@@ -145,21 +155,16 @@ Cada enlace punto a punto utiliza una máscara **/30** (`255.255.255.252`), que 
 
 | Enlace | Red | Extremo A | Extremo B | AS A / AS B |
 |:--|:--|:--|:--|:--|
-| FibraNet GT – AndinaCom | `192.168.70.0/30` | `192.168.70.1` (`FIB-CORE`) | `192.168.70.2` (`AND-CORE`) | 65001 / 65002 |
-| AndinaCom – MoonLink | `192.168.70.4/30` | `192.168.70.5` (`AND-CORE`) | `192.168.70.6` (`MOO-HUB`) | 65002 / 65003 |
-| FibraNet GT – MoonLink | `192.168.70.8/30` | `192.168.70.9` (`FIB-CORE`) | `192.168.70.10` (`MOO-HUB`) | 65001 / 65003 |
+| FibraNet GT – AndinaCom | `192.168.70.0/30` | `192.168.70.1` (`FIB-CORE` `Gi1/1/1`) | `192.168.70.2` (`AND-CORE` `Gi1/1/1`) | 65001 / 65002 |
+| AndinaCom – MoonLink | `192.168.70.4/30` | `192.168.70.5` (`AND-CORE` `Gi1/1/2`) | `192.168.70.6` (`MOO-HUB` `Gi1/1/1`) | 65002 / 65003 |
+| FibraNet GT – MoonLink | `192.168.70.8/30` | `192.168.70.9` (`FIB-CORE` `Gi1/1/2`) | `192.168.70.10` (`MOO-HUB` `Gi1/1/2`) | 65001 / 65003 |
 | Reserva | `192.168.70.12/30` | — | — | — |
 
 El conjunto completo de enlaces BGP se resume en `192.168.70.0/28`.
 
 #### Enlaces internos de FibraNet GT
 
-| Bloque | Red | Uso |
-|:--|:--|:--|
-| Enlaces internos FibraNet | `192.168.70.16/27` | Ocho subredes /30 disponibles: `.16`, `.20`, `.24`, `.28`, `.32`, `.36`, `.40`, `.44` |
-| Libre | `192.168.70.48/28` en adelante | Reserva para crecimiento |
-
-Enlaces utilizados dentro de `192.168.70.16/27`:
+Las dos subredes /25 consumen todo `172.16.10.0/24`, por eso los enlaces internos de este ISP salen de `192.168.70.16/27` (ocho /30 disponibles, cuatro usados):
 
 | Enlace | VLAN de tránsito | Red | Extremo A | Extremo B |
 |:--|:--:|:--|:--|:--|
@@ -168,7 +173,7 @@ Enlaces utilizados dentro de `192.168.70.16/27`:
 | `FIB-DIST1` – `FIB-ACC1` | — (puerto enrutado) | `192.168.70.24/30` | `.25` (DIST1) | `.26` (ACC1) |
 | `FIB-DIST2` – `FIB-ACC2` | — (puerto enrutado) | `192.168.70.28/30` | `.29` (DIST2) | `.30` (ACC2) |
 
-Los cuatro bloques restantes (`.32`, `.36`, `.40`, `.44`) quedan libres.
+Los bloques `192.168.70.32/30`, `.36/30`, `.40/30` y `.44/30` quedan libres, y desde `192.168.70.48/28` hay reserva para crecimiento.
 
 ---
 
@@ -179,6 +184,62 @@ Los cuatro bloques restantes (`.32`, `.36`, `.40`, `.44`) quedan libres.
 | FibraNet GT | 65001 | `172.16.10.0/24` | Administración, Atención al Cliente | /25 | OSPF (área 0) | Árbol |
 | AndinaCom | 65002 | `172.16.20.0/24` | Ventas, Facturación | /26 | OSPF (área 0) | Jerárquica (HSRP) |
 | MoonLink | 65003 | `172.16.32.0/24` | Soporte, Seguridad (+ Wi-Fi de Soporte) | /26 | EIGRP (AS 10) | Hub-and-spoke |
+
+---
+
+## Direccionamiento por dispositivo
+
+Resumen de las direcciones de cada interfaz enrutada o SVI, para consultar durante la configuración. Los hosts reciben su IP por DHCP.
+
+### FibraNet GT
+
+| Dispositivo | Interfaz | Dirección | Notas |
+|:--|:--|:--|:--|
+| `FIB-CORE` | SVI VLAN 101 | `192.168.70.17/30` | Hacia `FIB-DIST1` |
+| `FIB-CORE` | SVI VLAN 102 | `192.168.70.21/30` | Hacia `FIB-DIST2` |
+| `FIB-CORE` | `Gi1/1/1` | `192.168.70.1/30` | Fibra a `AND-CORE` |
+| `FIB-CORE` | `Gi1/1/2` | `192.168.70.9/30` | Fibra a `MOO-HUB` |
+| `FIB-DIST1` | SVI VLAN 101 | `192.168.70.18/30` | Hacia `FIB-CORE` |
+| `FIB-DIST1` | `Gi1/0/3` | `192.168.70.25/30` | Hacia `FIB-ACC1` (puerto enrutado) |
+| `FIB-DIST2` | SVI VLAN 102 | `192.168.70.22/30` | Hacia `FIB-CORE` |
+| `FIB-DIST2` | `Gi1/0/3` | `192.168.70.29/30` | Hacia `FIB-ACC2` (puerto enrutado) |
+| `FIB-ACC1` | `Gi1/0/1` | `192.168.70.26/30` | Hacia `FIB-DIST1` (puerto enrutado) |
+| `FIB-ACC1` | SVI VLAN 10 | `172.16.10.1/25` | Gateway de Administración |
+| `FIB-ACC2` | `Gi1/0/1` | `192.168.70.30/30` | Hacia `FIB-DIST2` (puerto enrutado) |
+| `FIB-ACC2` | SVI VLAN 20 | `172.16.10.129/25` | Gateway de Atención al Cliente |
+| `FIB-SRV` | `Fa0` | `172.16.10.125/25` | Gateway `172.16.10.1` (estático) |
+
+### AndinaCom
+
+| Dispositivo | Interfaz | Dirección | Notas |
+|:--|:--|:--|:--|
+| `AND-CORE` | SVI VLAN 111 | `172.16.20.193/30` | Hacia `AND-DIST1` |
+| `AND-CORE` | SVI VLAN 112 | `172.16.20.197/30` | Hacia `AND-DIST2` |
+| `AND-CORE` | `Gi1/1/1` | `192.168.70.2/30` | Fibra a `FIB-CORE` |
+| `AND-CORE` | `Gi1/1/2` | `192.168.70.5/30` | Fibra a `MOO-HUB` |
+| `AND-DIST1` | SVI VLAN 111 | `172.16.20.194/30` | Hacia `AND-CORE` |
+| `AND-DIST1` | SVI VLAN 30 / 40 / 50 | `172.16.20.2/26` · `172.16.20.66/26` · `172.16.20.130/27` | Reales de HSRP |
+| `AND-DIST2` | SVI VLAN 112 | `172.16.20.198/30` | Hacia `AND-CORE` |
+| `AND-DIST2` | SVI VLAN 30 / 40 / 50 | `172.16.20.3/26` · `172.16.20.67/26` · `172.16.20.131/27` | Reales de HSRP |
+| Virtuales HSRP | VLAN 30 / 40 / 50 | `172.16.20.1` · `172.16.20.65` · `172.16.20.129` | Gateways de los hosts |
+| `AND-DHCP` | `Fa0` | `172.16.20.132/27` | Gateway `172.16.20.129` (estático) |
+
+### MoonLink
+
+| Dispositivo | Interfaz | Dirección | Notas |
+|:--|:--|:--|:--|
+| `MOO-HUB` | SVI VLAN 121 | `172.16.32.193/30` | Hacia `MOO-SP1` |
+| `MOO-HUB` | SVI VLAN 122 | `172.16.32.197/30` | Hacia `MOO-SP2` |
+| `MOO-HUB` | `Gi1/0/6` | `172.16.32.201/30` | Hacia `MOO-SP3` (puerto enrutado) |
+| `MOO-HUB` | `Gi1/1/1` | `192.168.70.6/30` | Fibra a `AND-CORE` |
+| `MOO-HUB` | `Gi1/1/2` | `192.168.70.10/30` | Fibra a `FIB-CORE` |
+| `MOO-SP1` | SVI VLAN 121 | `172.16.32.194/30` | Hacia `MOO-HUB` |
+| `MOO-SP1` | SVI VLAN 60 | `172.16.32.1/26` | Gateway de Soporte |
+| `MOO-SP2` | SVI VLAN 122 | `172.16.32.198/30` | Hacia `MOO-HUB` |
+| `MOO-SP2` | SVI VLAN 70 | `172.16.32.65/26` | Gateway de Seguridad |
+| `MOO-SP3` | `Gi1/0/2` | `172.16.32.202/30` | Hacia `MOO-HUB` (puerto enrutado) |
+| `MOO-SP3` | SVI VLAN 80 | `172.16.32.129/26` | Gateway de Soporte Wi-Fi |
+| `MOO-WIFI` | Gestión | `172.16.32.130/26` | Estático, puerto LAN al `MOO-SP3` |
 
 ---
 
@@ -205,14 +266,14 @@ Cada ISP es un dominio independiente, por lo que sus VLANs no se mezclan. Las VL
 
 ### Enlaces LACP (mínimo 2 por ISP)
 
-| ISP | Port-channel | Extremos | Cables | Modo |
-|:--|:--|:--|:--:|:--|
-| FibraNet GT | `Po1` | `FIB-CORE` – `FIB-DIST1` | 2 | LACP (`active`), troncal solo VLAN 101 |
-| FibraNet GT | `Po2` | `FIB-CORE` – `FIB-DIST2` | 2 | LACP (`active`), troncal solo VLAN 102 |
-| AndinaCom | `Po1` | `AND-CORE` – `AND-DIST1` | 2 | LACP (`active`), troncal solo VLAN 111 |
-| AndinaCom | `Po2` | `AND-CORE` – `AND-DIST2` | 2 | LACP (`active`), troncal solo VLAN 112 |
-| MoonLink | `Po1` | `MOO-HUB` – `MOO-SP1` | 2 | LACP (`active`), troncal solo VLAN 121 |
-| MoonLink | `Po2` | `MOO-HUB` – `MOO-SP2` | 2 | LACP (`active`), troncal solo VLAN 122 |
+| ISP | Port-channel | Extremos | Puertos | Modo |
+|:--|:--|:--|:--|:--|
+| FibraNet GT | `Po1` | `FIB-CORE` – `FIB-DIST1` | `Gi1/0/1-2` en ambos | LACP (`active`), troncal solo VLAN 101 |
+| FibraNet GT | `Po2` | `FIB-CORE` – `FIB-DIST2` | `Gi1/0/3-4` (CORE) y `Gi1/0/1-2` (DIST2) | LACP (`active`), troncal solo VLAN 102 |
+| AndinaCom | `Po1` | `AND-CORE` – `AND-DIST1` | `Gi1/0/1-2` en ambos | LACP (`active`), troncal solo VLAN 111 |
+| AndinaCom | `Po2` | `AND-CORE` – `AND-DIST2` | `Gi1/0/3-4` (CORE) y `Gi1/0/1-2` (DIST2) | LACP (`active`), troncal solo VLAN 112 |
+| MoonLink | `Po1` | `MOO-HUB` – `MOO-SP1` | `Gi1/0/1-2` en ambos | LACP (`active`), troncal solo VLAN 121 |
+| MoonLink | `Po2` | `MOO-HUB` – `MOO-SP2` | `Gi1/0/3-4` (HUB) y `Gi1/0/1-2` (SP2) | LACP (`active`), troncal solo VLAN 122 |
 
 ---
 
@@ -263,11 +324,11 @@ El dispositivo es el **Wireless Router WRT300N** de Packet Tracer (categoría Wi
 
 | Parámetro | Valor |
 |:--|:--|
-| Conexión | Puerto LAN del WRT300N a un puerto de acceso VLAN 80 de `MOO-SP3` (el puerto Internet queda libre) |
+| Conexión | Puerto LAN (`Ethernet 1`) del WRT300N a `MOO-SP3` `Gi1/0/1`, puerto de acceso VLAN 80 (el puerto Internet queda libre) |
 | DHCP en el WRT300N | Apagado |
-| IP de gestión | `172.16.32.130` (estática) |
+| IP de gestión | `172.16.32.130/26` (estática) |
 | Seguridad | WPA2-PSK, SSID `MoonLink-WiFi` |
-| Cliente | `MOO-LAPTOP` (Laptop-PT, tarjeta WPC300N incluida) |
+| Cliente | `MOO-LAPTOP` (Laptop-PT, tarjeta WPC300N incluida), conectada solo por Wi-Fi, sin cable |
 
 Como el WRT300N solo tiene interfaz gráfica, es el único dispositivo que no se configura por CLI.
 
@@ -312,28 +373,7 @@ Las ACLs se aplican **inbound en la SVI de cada departamento**, lo más cerca po
 
 ---
 
-## Orden de implementación
-
-| Orden | Etapa | Resultado esperado |
-|:--:|:--|:--|
-| 0 | Verificar en un `3650-24PS` que existe `router bgp` y agregar los módulos de fibra `GLC-LH-SMD` a los 3 equipos de borde | Confirmado que el 3650 sirve como borde BGP |
-| 1 | FibraNet GT: topología en árbol, LACP, OSPF y servidor DNS/HTTP/HTTPS | Red interna convergida y página web accesible dentro del ISP |
-| 2 | AndinaCom: topología jerárquica, LACP, VLANs, OSPF, HSRP y servidor DHCP | Conmutación HSRP comprobada y DHCP operativo en su red |
-| 3 | MoonLink: topología hub-and-spoke, LACP, EIGRP y red inalámbrica | Vecindades EIGRP establecidas y Wi-Fi funcional |
-| 4 | Interconexión eBGP entre los tres switches multicapa de borde | Vecinos BGP establecidos y rutas intercambiadas |
-| 5 | DHCP relay, DNS y HTTP/HTTPS entre ISPs | Todos los hosts obtienen IP por DHCP y resuelven el dominio |
-| 6 | ACLs extendidas según la tabla 4.2 | Matriz de ping y acceso web verificada |
-| 7 | Wireshark, análisis en modo simulación, manual técnico y presentación | Entregables completos |
-
-### Notas sobre eBGP en Packet Tracer
-
-- Packet Tracer solo soporta eBGP, y no acepta `update-source` ni `ebgp-multihop`. Por eso los vecinos se declaran con las IP directas de cada enlace /30.
-- Router IDs sugeridos: `1.1.1.1` (`FIB-CORE`), `2.2.2.2` (`AND-CORE`), `3.3.3.3` (`MOO-HUB`).
-- Cada borde anuncia el /24 de su ISP e inyecta lo aprendido por BGP en su protocolo interno (OSPF o EIGRP), para que los equipos internos tengan ruta de regreso.
-
----
-
-## Topología física completa
+## Topología física
 
 ```mermaid
 flowchart TB
@@ -447,43 +487,90 @@ flowchart TB
 | `MOO-PC1`, `MOO-PC2` | PC | MoonLink | Hosts de Soporte |
 | `MOO-PC3`, `MOO-PC4` | PC | MoonLink | Hosts de Seguridad |
 
-### Lista de cables
-
-| ISP | Origen | Destino | Cantidad | Tipo |
-|:--|:--|:--|:--:|:--|
-| FibraNet GT | `FIB-CORE` | `FIB-DIST1` | 2 | Cobre cruzado (LACP, `Po1`) |
-| FibraNet GT | `FIB-CORE` | `FIB-DIST2` | 2 | Cobre cruzado (LACP, `Po2`) |
-| FibraNet GT | `FIB-DIST1` | `FIB-ACC1` | 1 | Cobre cruzado (puerto enrutado) |
-| FibraNet GT | `FIB-DIST2` | `FIB-ACC2` | 1 | Cobre cruzado (puerto enrutado) |
-| FibraNet GT | `FIB-ACC1` | `FIB-SRV`, `FIB-PC1`, `FIB-PC2`, `FIB-PC3` | 4 | Cobre directo |
-| FibraNet GT | `FIB-ACC2` | `FIB-PC4`, `FIB-PC5` | 2 | Cobre directo |
-| AndinaCom | `AND-CORE` | `AND-DIST1` | 2 | Cobre cruzado (LACP, `Po1`) |
-| AndinaCom | `AND-CORE` | `AND-DIST2` | 2 | Cobre cruzado (LACP, `Po2`) |
-| AndinaCom | `AND-DIST1` | `AND-ACC1` y `AND-ACC2` | 2 | Cobre cruzado (troncal VLAN 30, 40, 50) |
-| AndinaCom | `AND-DIST2` | `AND-ACC1` y `AND-ACC2` | 2 | Cobre cruzado (troncal VLAN 30, 40, 50) |
-| AndinaCom | `AND-ACC1` | `AND-PC1`, `AND-PC2`, `AND-PC3` | 3 | Cobre directo |
-| AndinaCom | `AND-ACC2` | `AND-PC4`, `AND-PC5`, `AND-DHCP` | 3 | Cobre directo |
-| MoonLink | `MOO-HUB` | `MOO-SP1` | 2 | Cobre cruzado (LACP, `Po1`) |
-| MoonLink | `MOO-HUB` | `MOO-SP2` | 2 | Cobre cruzado (LACP, `Po2`) |
-| MoonLink | `MOO-HUB` | `MOO-SP3` | 1 | Cobre cruzado (puerto enrutado) |
-| MoonLink | `MOO-SP3` | `MOO-WIFI` (puerto LAN) | 1 | Cobre directo |
-| MoonLink | `MOO-SP1` | `MOO-PC1`, `MOO-PC2` | 2 | Cobre directo |
-| MoonLink | `MOO-SP2` | `MOO-PC3`, `MOO-PC4` | 2 | Cobre directo |
-| MoonLink | `MOO-WIFI` | `MOO-LAPTOP` | — | Inalámbrico |
-| Interconexión | `FIB-CORE` | `AND-CORE` | 1 | Fibra óptica |
-| Interconexión | `AND-CORE` | `MOO-HUB` | 1 | Fibra óptica |
-| Interconexión | `FIB-CORE` | `MOO-HUB` | 1 | Fibra óptica |
-
 **Totales:** 14 switches multicapa 3650-24PS, 1 Wireless Router WRT300N, 15 equipos de usuario (14 PCs y 1 laptop), 2 servidores y 39 cables (36 de cobre y 3 de fibra), más el enlace inalámbrico de la laptop.
 
-### Orden de construcción
+---
 
-1. Colocar los 14 switches multicapa, el WRT300N, los 2 servidores y los hosts, y nombrarlos como se indica en la tabla.
-2. Agregar a `FIB-CORE`, `AND-CORE` y `MOO-HUB` dos módulos de fibra `GLC-LH-SMD` cada uno (apagar el switch, insertar los módulos y volver a encender).
-3. Cablear FibraNet GT, empezando por los pares LACP.
-4. Cablear AndinaCom, empezando por los pares LACP y siguiendo con las troncales de distribución a acceso.
-5. Cablear MoonLink y asociar la laptop al WRT300N.
-6. Conectar los tres enlaces de fibra entre `FIB-CORE`, `AND-CORE` y `MOO-HUB`.
+## Conexiones por puerto
+
+Estas tablas son el cableado real armado en Packet Tracer. Los cables entre switches son cruzados (Copper Cross Over) y los de hosts y servidores son directos (Copper Straight-Through).
+
+### FibraNet GT (12 cables)
+
+| Origen | Puerto | Destino | Puerto | Cable |
+|:--|:--|:--|:--|:--|
+| `FIB-CORE` | `Gi1/0/1` | `FIB-DIST1` | `Gi1/0/1` | Cruzado |
+| `FIB-CORE` | `Gi1/0/2` | `FIB-DIST1` | `Gi1/0/2` | Cruzado |
+| `FIB-CORE` | `Gi1/0/3` | `FIB-DIST2` | `Gi1/0/1` | Cruzado |
+| `FIB-CORE` | `Gi1/0/4` | `FIB-DIST2` | `Gi1/0/2` | Cruzado |
+| `FIB-DIST1` | `Gi1/0/3` | `FIB-ACC1` | `Gi1/0/1` | Cruzado |
+| `FIB-DIST2` | `Gi1/0/3` | `FIB-ACC2` | `Gi1/0/1` | Cruzado |
+| `FIB-ACC1` | `Gi1/0/2` | `FIB-PC1` | `Fa0` | Directo |
+| `FIB-ACC1` | `Gi1/0/3` | `FIB-PC2` | `Fa0` | Directo |
+| `FIB-ACC1` | `Gi1/0/4` | `FIB-PC3` | `Fa0` | Directo |
+| `FIB-ACC1` | `Gi1/0/5` | `FIB-SRV` | `Fa0` | Directo |
+| `FIB-ACC2` | `Gi1/0/2` | `FIB-PC4` | `Fa0` | Directo |
+| `FIB-ACC2` | `Gi1/0/3` | `FIB-PC5` | `Fa0` | Directo |
+
+### AndinaCom (14 cables)
+
+| Origen | Puerto | Destino | Puerto | Cable |
+|:--|:--|:--|:--|:--|
+| `AND-CORE` | `Gi1/0/1` | `AND-DIST1` | `Gi1/0/1` | Cruzado |
+| `AND-CORE` | `Gi1/0/2` | `AND-DIST1` | `Gi1/0/2` | Cruzado |
+| `AND-CORE` | `Gi1/0/3` | `AND-DIST2` | `Gi1/0/1` | Cruzado |
+| `AND-CORE` | `Gi1/0/4` | `AND-DIST2` | `Gi1/0/2` | Cruzado |
+| `AND-DIST1` | `Gi1/0/3` | `AND-ACC1` | `Gi1/0/1` | Cruzado |
+| `AND-DIST2` | `Gi1/0/3` | `AND-ACC2` | `Gi1/0/1` | Cruzado |
+| `AND-DIST2` | `Gi1/0/4` | `AND-ACC1` | `Gi1/0/5` | Cruzado |
+| `AND-ACC2` | `Gi1/0/5` | `AND-DIST1` | `Gi1/0/4` | Cruzado |
+| `AND-ACC1` | `Gi1/0/2` | `AND-PC1` | `Fa0` | Directo |
+| `AND-ACC1` | `Gi1/0/3` | `AND-PC2` | `Fa0` | Directo |
+| `AND-ACC1` | `Gi1/0/4` | `AND-PC3` | `Fa0` | Directo |
+| `AND-ACC2` | `Gi1/0/2` | `AND-PC4` | `Fa0` | Directo |
+| `AND-ACC2` | `Gi1/0/3` | `AND-PC5` | `Fa0` | Directo |
+| `AND-ACC2` | `Gi1/0/4` | `AND-DHCP` | `Fa0` | Directo |
+
+### MoonLink (10 cables)
+
+| Origen | Puerto | Destino | Puerto | Cable |
+|:--|:--|:--|:--|:--|
+| `MOO-HUB` | `Gi1/0/1` | `MOO-SP1` | `Gi1/0/1` | Cruzado |
+| `MOO-HUB` | `Gi1/0/2` | `MOO-SP1` | `Gi1/0/2` | Cruzado |
+| `MOO-HUB` | `Gi1/0/3` | `MOO-SP2` | `Gi1/0/1` | Cruzado |
+| `MOO-HUB` | `Gi1/0/4` | `MOO-SP2` | `Gi1/0/2` | Cruzado |
+| `MOO-HUB` | `Gi1/0/6` | `MOO-SP3` | `Gi1/0/2` | Cruzado |
+| `MOO-SP1` | `Gi1/0/3` | `MOO-PC1` | `Fa0` | Directo |
+| `MOO-SP1` | `Gi1/0/4` | `MOO-PC2` | `Fa0` | Directo |
+| `MOO-SP2` | `Gi1/0/3` | `MOO-PC3` | `Fa0` | Directo |
+| `MOO-SP2` | `Gi1/0/4` | `MOO-PC4` | `Fa0` | Directo |
+| `MOO-SP3` | `Gi1/0/1` | `MOO-WIFI` | `Ethernet 1` (LAN) | Directo |
+
+### Interconexión entre ISPs (3 cables de fibra)
+
+| Origen | Puerto | Destino | Puerto | Cable |
+|:--|:--|:--|:--|:--|
+| `FIB-CORE` | `Gi1/1/1` | `AND-CORE` | `Gi1/1/1` | Fibra |
+| `FIB-CORE` | `Gi1/1/2` | `MOO-HUB` | `Gi1/1/2` | Fibra |
+| `AND-CORE` | `Gi1/1/2` | `MOO-HUB` | `Gi1/1/1` | Fibra |
+
+### Función de cada puerto
+
+| Dispositivo | Puertos y función |
+|:--|:--|
+| `FIB-CORE` | `Gi1/0/1-2` → `Po1` (VLAN 101) · `Gi1/0/3-4` → `Po2` (VLAN 102) · `Gi1/1/1` y `Gi1/1/2` enrutados (fibra) |
+| `FIB-DIST1` / `FIB-DIST2` | `Gi1/0/1-2` → `Po1` / `Po2` · `Gi1/0/3` enrutado hacia el acceso |
+| `FIB-ACC1` | `Gi1/0/1` enrutado · `Gi1/0/2-5` acceso VLAN 10 (PC1, PC2, PC3, SRV) |
+| `FIB-ACC2` | `Gi1/0/1` enrutado · `Gi1/0/2-3` acceso VLAN 20 (PC4, PC5) |
+| `AND-CORE` | `Gi1/0/1-2` → `Po1` (VLAN 111) · `Gi1/0/3-4` → `Po2` (VLAN 112) · `Gi1/1/1` y `Gi1/1/2` enrutados (fibra) |
+| `AND-DIST1` | `Gi1/0/1-2` → `Po1` · `Gi1/0/3` troncal a ACC1 · `Gi1/0/4` troncal a ACC2 |
+| `AND-DIST2` | `Gi1/0/1-2` → `Po2` · `Gi1/0/3` troncal a ACC2 · `Gi1/0/4` troncal a ACC1 |
+| `AND-ACC1` | `Gi1/0/1` y `Gi1/0/5` troncales (DIST1 y DIST2) · `Gi1/0/2-4` acceso VLAN 30 |
+| `AND-ACC2` | `Gi1/0/1` y `Gi1/0/5` troncales (DIST2 y DIST1) · `Gi1/0/2-3` acceso VLAN 40 · `Gi1/0/4` acceso VLAN 50 |
+| `MOO-HUB` | `Gi1/0/1-2` → `Po1` (VLAN 121) · `Gi1/0/3-4` → `Po2` (VLAN 122) · `Gi1/0/6` enrutado a SP3 · `Gi1/1/1` y `Gi1/1/2` enrutados (fibra) |
+| `MOO-SP1` | `Gi1/0/1-2` → `Po1` · `Gi1/0/3-4` acceso VLAN 60 |
+| `MOO-SP2` | `Gi1/0/1-2` → `Po2` · `Gi1/0/3-4` acceso VLAN 70 |
+| `MOO-SP3` | `Gi1/0/2` enrutado a HUB · `Gi1/0/1` acceso VLAN 80 (WRT300N) |
 
 ---
 
@@ -498,24 +585,182 @@ flowchart TB
 7. **Conflicto en la tabla 4.2.** Las filas de Soporte y Administración dicen "bidireccional con cualquier departamento", mientras que otra fila bloquea "cualquier departamento → Seguridad". Se resolvió dando prioridad a la regla de Seguridad: ningún departamento inicia tráfico hacia Seguridad, solo pasan las respuestas (`echo-reply` y `established`) a lo que Seguridad inició.
 8. **Capa 3 en AndinaCom.** Los switches de acceso `AND-ACC1` y `AND-ACC2` son 3650-24PS operando en capa 2, y se cuentan entre los 5 equipos multicapa del ISP, igual que el enunciado llama "routers o switches de capa 3" a los 3650 de su topología base.
 9. **Direccionamiento de servidores.** Los servidores `FIB-SRV` y `AND-DHCP` llevan IP estática, porque no pueden obtener por DHCP la dirección con la que ofrecen el servicio. Todos los demás dispositivos finales usan DHCP.
+10. **Sin enlace entre `AND-DIST1` y `AND-DIST2`.** Los mensajes HSRP viajan por los switches de acceso, que se conectan a ambas distribuciones. Spanning Tree bloquea uno de los dos caminos de cada VLAN para evitar bucles.
 
 ---
 
-## Entregables
+## Plan de configuración
 
-| Entregable | Nombre de archivo | Estado |
-|:--|:--|:--|
-| Archivo de simulación | `Proyecto2_201504070.pkt` | Pendiente |
-| Manual técnico (PDF o Markdown) | En `Proyecto_2/` | Pendiente |
-| Captura de tráfico (desde VM) | `Proyecto_2/Wireshark/captura_wireshark_201504070.pcapng` | Pendiente |
-| Presentación ejecutiva (5 a 10 min) | `Proyecto2_Presentacion_201504070.pdf` | Pendiente |
-| Enlace al repositorio en UEDI | Antes del 23/10/2026, con acceso para el auxiliar | Pendiente |
+La configuración se hace por fases, una a la vez, y cada fase se verifica antes de pasar a la siguiente. Después de cada fase se guarda con `write memory`.
+
+| Fase | Qué se configura | Cómo se verifica | Estado |
+|:--:|:--|:--|:--|
+| 0 | Confirmar que el 3650-24PS ofrece `router bgp`, y nombrar los 14 equipos (hostname) | `router ?` en un 3650 | Pendiente |
+| 1 | FibraNet: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, puertos enrutados y puertos de acceso | `show etherchannel summary`, `show ip interface brief` | Pendiente |
+| 2 | FibraNet: SVIs gateway (VLAN 10 y 20) y OSPF área 0 en los 5 switches | `show ip ospf neighbor`, ping entre los gateways | Pendiente |
+| 3 | `FIB-SRV`: IP estática, DNS (`www.proyecto2_201504070.com`) y HTTP/HTTPS con la página | Navegador desde un PC con IP estática temporal | Pendiente |
+| 4 | AndinaCom: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, troncales y puertos de acceso | `show etherchannel summary`, `show interfaces trunk` | Pendiente |
+| 5 | AndinaCom: SVIs de usuario, HSRP, raíz de STP y OSPF área 0 | `show standby brief`, `show ip ospf neighbor` | Pendiente |
+| 6 | `AND-DHCP`: IP estática y los 7 pools; `ip helper-address` en las SVIs de AndinaCom | DHCP DORA en los PCs de AndinaCom, y prueba de conmutación HSRP apagando `AND-DIST1` | Pendiente |
+| 7 | MoonLink: VLANs, LACP (`Po1` y `Po2`), SVIs, puerto enrutado a SP3, accesos y EIGRP AS 10 | `show ip eigrp neighbors`, ping entre gateways | Pendiente |
+| 8 | MoonLink: WRT300N en modo puente (DHCP apagado, IP de gestión, SSID y WPA2) y asociación de la laptop | La laptop se asocia al SSID | Pendiente |
+| 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Pendiente |
+| 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | Pendiente |
+| 11 | ACLs extendidas por departamento (orden de reglas y tabla 4.2) | Matriz de ping y acceso web entre todos los pares de departamentos | Pendiente |
+| 12 | Guardado final (`write memory`), archivo `.pkt`, capturas y pruebas para el manual | Reinicio de dispositivos y revisión de que todo persiste | Pendiente |
+| 13 | Captura en Wireshark desde una VM (TCP handshake, DNS, HTTP/HTTPS, ICMP) | Archivo `.pcapng` abre en Wireshark | Pendiente |
+| 14 | Práctica del modo simulación (DHCP DORA, DNS, HTTP/HTTPS, OSPF/EIGRP y BGP) | Explicar capa por capa un paquete elegido al azar | Pendiente |
+| 15 | Manual técnico, presentación ejecutiva y commits en el repositorio | Entregables completos antes del 23/10/2026 | Pendiente |
+
+### Notas sobre eBGP en Packet Tracer
+
+- Packet Tracer solo soporta eBGP, y no acepta `update-source` ni `ebgp-multihop`. Por eso los vecinos se declaran con las IP directas de cada enlace /30.
+- Router IDs sugeridos: `1.1.1.1` (`FIB-CORE`), `2.2.2.2` (`AND-CORE`), `3.3.3.3` (`MOO-HUB`).
+- Cada borde anuncia el /24 de su ISP e inyecta lo aprendido por BGP en su protocolo interno (OSPF o EIGRP), para que los equipos internos tengan ruta de regreso.
+- Las pruebas de la fase 3 usan una IP estática temporal en un PC, que debe volver a DHCP antes de la evaluación.
 
 ---
 
-## Supuestos del diseño
+## Configuración de hostname
 
-- Los enlaces de fibra requieren el módulo `GLC-LH-SMD` en los tres equipos de borde, y el 3650-24PS de Packet Tracer lo acepta.
-- Antes de construir hay que confirmar que el 3650-24PS ofrece `router bgp`. Si no lo ofrece, los tres equipos de borde pasan a ser routers (por ejemplo, ISR 4331) y el resto del diseño no cambia.
-- En AndinaCom, cada switch de acceso se conecta a ambos switches de distribución, lo que permite que HSRP conmute sin pérdida de comunicación. Spanning Tree bloquea de forma automática uno de los dos caminos de cada VLAN para evitar bucles.
-- Entre `AND-DIST1` y `AND-DIST2` no hay enlace directo. Los mensajes HSRP viajan por los switches de acceso.
+FIB-CORE:
+```
+enable
+configure terminal
+hostname FIB-CORE
+no ip domain-lookup
+end
+write memory
+```
+
+FIB-DIST1:
+```
+enable
+configure terminal
+hostname FIB-DIST1
+no ip domain-lookup
+end
+write memory
+```
+
+FIB-DIST2:
+```
+enable
+configure terminal
+hostname FIB-DIST2
+no ip domain-lookup
+end
+write memory
+```
+
+FIB-ACC1:
+```
+enable
+configure terminal
+hostname FIB-ACC1
+no ip domain-lookup
+end
+write memory
+```
+
+FIB-ACC2:
+```
+enable
+configure terminal
+hostname FIB-ACC2
+no ip domain-lookup
+end
+write memory
+```
+
+AND-CORE:
+```
+enable
+configure terminal
+hostname AND-CORE
+no ip domain-lookup
+end
+write memory
+```
+
+AND-DIST1:
+```
+enable
+configure terminal
+hostname AND-DIST1
+no ip domain-lookup
+end
+write memory
+```
+
+AND-DIST2:
+```
+enable
+configure terminal
+hostname AND-DIST2
+no ip domain-lookup
+end
+write memory
+```
+
+AND-ACC1:
+```
+enable
+configure terminal
+hostname AND-ACC1
+no ip domain-lookup
+end
+write memory
+```
+
+AND-ACC2:
+```
+enable
+configure terminal
+hostname AND-ACC2
+no ip domain-lookup
+end
+write memory
+```
+
+MOO-HUB:
+```
+enable
+configure terminal
+hostname MOO-HUB
+no ip domain-lookup
+end
+write memory
+```
+
+MOO-SP1:
+```
+enable
+configure terminal
+hostname MOO-SP1
+no ip domain-lookup
+end
+write memory
+```
+
+MOO-SP2:
+```
+enable
+configure terminal
+hostname MOO-SP2
+no ip domain-lookup
+end
+write memory
+```
+
+MOO-SP3:
+```
+enable
+configure terminal
+hostname MOO-SP3
+no ip domain-lookup
+end
+write memory
+```
+
+---
