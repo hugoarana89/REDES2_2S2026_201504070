@@ -763,4 +763,205 @@ end
 write memory
 ```
 
+## Fase 1 · Configuración de FibraNet GT
+
+La agregación de enlaces se configura en dos pasos: los puertos físicos solo reciben `channel-group`, y el modo troncal con la VLAN permitida se define únicamente en la interfaz `port-channel`. El comando `switchport trunk encapsulation dot1q` no existe en el 3650-24PS de Packet Tracer, por lo que no se utiliza.
+
+FIB-CORE:
+```
+enable
+configure terminal
+hostname FIB-CORE
+no ip domain-lookup
+ip routing
+!
+vlan 101
+ name TRANSITO-C-D1
+vlan 102
+ name TRANSITO-C-D2
+ exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 1 mode active
+ exit
+interface range gigabitEthernet 1/0/3 - 4
+ channel-group 2 mode active
+ exit
+!
+interface port-channel 1
+ switchport mode trunk
+ switchport trunk allowed vlan 101
+ exit
+interface port-channel 2
+ switchport mode trunk
+ switchport trunk allowed vlan 102
+ exit
+!
+interface vlan 101
+ ip address 192.168.70.17 255.255.255.252
+ no shutdown
+ exit
+interface vlan 102
+ ip address 192.168.70.21 255.255.255.252
+ no shutdown
+ end
+write memory
+```
+
+FIB-DIST1:
+```
+enable
+configure terminal
+hostname FIB-DIST1
+no ip domain-lookup
+ip routing
+!
+vlan 101
+ name TRANSITO-C-D1
+ exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 1 mode active
+ exit
+interface port-channel 1
+ switchport mode trunk
+ switchport trunk allowed vlan 101
+ exit
+!
+interface vlan 101
+ ip address 192.168.70.18 255.255.255.252
+ no shutdown
+ exit
+!
+interface gigabitEthernet 1/0/3
+ no switchport
+ ip address 192.168.70.25 255.255.255.252
+ no shutdown
+ end
+write memory
+```
+
+FIB-DIST2:
+```
+enable
+configure terminal
+hostname FIB-DIST2
+no ip domain-lookup
+ip routing
+!
+vlan 102
+ name TRANSITO-C-D2
+ exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 2 mode active
+ exit
+interface port-channel 2
+ switchport mode trunk
+ switchport trunk allowed vlan 102
+ exit
+!
+interface vlan 102
+ ip address 192.168.70.22 255.255.255.252
+ no shutdown
+ exit
+!
+interface gigabitEthernet 1/0/3
+ no switchport
+ ip address 192.168.70.29 255.255.255.252
+ no shutdown
+ end
+write memory
+```
+
+FIB-ACC1:
+```
+enable
+configure terminal
+hostname FIB-ACC1
+no ip domain-lookup
+ip routing
+!
+vlan 10
+ name ADMINISTRACION
+ exit
+!
+interface gigabitEthernet 1/0/1
+ no switchport
+ ip address 192.168.70.26 255.255.255.252
+ no shutdown
+ exit
+!
+interface range gigabitEthernet 1/0/2 - 5
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ end
+write memory
+```
+
+FIB-ACC2:
+```
+enable
+configure terminal
+hostname FIB-ACC2
+no ip domain-lookup
+ip routing
+!
+vlan 20
+ name ATENCION
+ exit
+!
+interface gigabitEthernet 1/0/1
+ no switchport
+ ip address 192.168.70.30 255.255.255.252
+ no shutdown
+ exit
+!
+interface range gigabitEthernet 1/0/2 - 3
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ end
+write memory
+```
+
+El comando `spanning-tree portfast` muestra una advertencia en pantalla, y es normal.
+
+Si los puertos de un port-channel quedan en `I` o `s`, o aparece el mensaje `vlan mask is different`, se revisa que los puertos físicos no tengan `switchport mode trunk` ni `switchport trunk allowed vlan`. La configuración troncal se define solo en la interfaz `port-channel`; cuando hay diferencias entre ambas, el simulador suspende los puertos y no vuelve a negociar por sí solo.
+
 ---
+
+## Verificación de la fase 1 · FibraNet GT
+
+FIB-CORE:
+```
+show etherchannel summary
+show interfaces trunk
+show ip interface brief
+ping 192.168.70.18
+ping 192.168.70.22
+```
+
+FIB-DIST1:
+```
+show etherchannel summary
+show ip interface brief
+ping 192.168.70.26
+```
+
+FIB-DIST2:
+```
+show etherchannel summary
+show ip interface brief
+ping 192.168.70.30
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show etherchannel summary` | `Po1` y `Po2` en `SU`, y cada puerto miembro con la marca `P` |
+| `show interfaces trunk` | `Po1` permite solo la VLAN 101 y `Po2` solo la VLAN 102 |
+| `show ip interface brief` | `Vlan101` y `Vlan102` en `up/down` o `up/up` según el extremo, y los puertos enrutados con su IP |
+| Pings | Responden (el primer paquete puede perderse por el ARP) |
