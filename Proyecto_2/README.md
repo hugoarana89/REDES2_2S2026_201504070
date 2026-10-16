@@ -1631,3 +1631,167 @@ Resultado esperado:
 El core aprende cada subred de usuario por las dos distribuciones, porque ambas la anuncian por OSPF. Eso es normal: reparte la carga entre las dos rutas, y el gateway que usan los equipos lo decide HSRP.
 
 ---
+
+## Fase 6 · Configuración de IP estática en AND-DHCP
+
+El servidor `AND-DHCP` se configura desde la interfaz gráfica de Packet Tracer. Se hace clic sobre el servidor, se abre la pestaña **Config** y se entra a **FastEthernet0**, en la sección **INTERFACE**.
+
+| Parámetro | Valor |
+|:--|:--|
+| IP Configuration | Static |
+| IPv4 Address | `172.16.20.132` |
+| Subnet Mask | `255.255.255.224` |
+
+Después se abre **GLOBAL**, **Settings**, y se completan los datos de red del servidor:
+
+| Parámetro | Valor |
+|:--|:--|
+| Gateway/DNS IPv4 | Static |
+| Default Gateway | `172.16.20.129` |
+| DNS Server | `172.16.10.125` |
+
+El gateway es la IP virtual de HSRP de la VLAN 50, de modo que el servidor sigue alcanzable si una de las dos distribuciones falla. El DNS (`172.16.10.125`) todavía no responde desde AndinaCom, porque depende de BGP, y no afecta a DHCP.
+
+---
+
+## Fase 6 · Configuración de los pools de DHCP
+
+En la pestaña **Services** del servidor se selecciona **DHCP** y se activa el servicio (**Service**, **On**). Luego se crean los siete pools, uno por VLAN de usuario de los tres ISP.
+
+El pool llamado `serverPool` existe por defecto. Se edita con los datos del pool `VENTAS` y se pulsa **Save**. Los otros seis se crean cambiando los datos y pulsando **Add**. El campo **TFTP Server Address** y el de **WLC** se dejan en `0.0.0.0`.
+
+| Pool | Default Gateway | DNS Server | Start IP Address | Subnet Mask | Maximum Number of Users |
+|:--|:--|:--|:--|:--|:--:|
+| `ADMINISTRACION` | `172.16.10.1` | `172.16.10.125` | `172.16.10.2` | `255.255.255.128` | 108 |
+| `ATENCION` | `172.16.10.129` | `172.16.10.125` | `172.16.10.130` | `255.255.255.128` | 125 |
+| `VENTAS` | `172.16.20.1` | `172.16.10.125` | `172.16.20.4` | `255.255.255.192` | 59 |
+| `FACTURACION` | `172.16.20.65` | `172.16.10.125` | `172.16.20.68` | `255.255.255.192` | 59 |
+| `SOPORTE` | `172.16.32.1` | `172.16.10.125` | `172.16.32.2` | `255.255.255.192` | 61 |
+| `SEGURIDAD` | `172.16.32.65` | `172.16.10.125` | `172.16.32.66` | `255.255.255.192` | 61 |
+| `SOPORTE-WIFI` | `172.16.32.129` | `172.16.10.125` | `172.16.32.131` | `255.255.255.192` | 60 |
+
+Los rangos dejan fuera las IPs de los gateways, las reales de HSRP, el rango de servidores de FibraNet (`.110` a `.126`) y la IP de gestión del router inalámbrico (`.130`). Los pools de FibraNet y MoonLink se crean ahora, pero no se pueden probar hasta las fases 7 a 10.
+
+---
+
+## Fase 6 · Configuración del relay DHCP en AndinaCom
+
+Las VLAN 30 y 40 reenvían las peticiones DHCP de los hosts hacia el servidor, que vive en otra subred (VLAN 50). Se configura en las dos distribuciones, porque cualquiera de las dos puede estar activa en HSRP. La VLAN 50 no lleva relay.
+
+AND-DIST1:
+```
+enable
+configure terminal
+interface vlan 30
+ ip helper-address 172.16.20.132
+exit
+interface vlan 40
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+AND-DIST2:
+```
+enable
+configure terminal
+interface vlan 30
+ ip helper-address 172.16.20.132
+exit
+interface vlan 40
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+---
+
+## Fase 6 · Configuración de los PCs de AndinaCom en DHCP
+
+En cada uno de los cinco PCs se abre **Desktop**, **IP Configuration**, y se selecciona **DHCP**.
+
+| PC | VLAN | Equipo de acceso |
+|:--|:--:|:--|
+| `AND-PC1`, `AND-PC2`, `AND-PC3` | 30 (Ventas) | `AND-ACC1` |
+| `AND-PC4`, `AND-PC5` | 40 (Facturación) | `AND-ACC2` |
+
+---
+
+## Verificación de la fase 6 · AndinaCom
+
+En `AND-PC1` y en `AND-PC4`, en **Desktop**, **Command Prompt**:
+
+```
+ipconfig /all
+ping 172.16.20.132
+```
+
+En `AND-PC1`:
+```
+ping 172.16.20.65
+```
+
+En `AND-DIST1`:
+```
+show running-config | include helper-address
+show standby brief
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `ipconfig /all` en los PCs de Ventas | IP entre `172.16.20.4` y `.62`, máscara `255.255.255.192`, gateway `172.16.20.1` y DNS `172.16.10.125` |
+| `ipconfig /all` en los PCs de Facturación | IP entre `172.16.20.68` y `.126`, máscara `255.255.255.192`, gateway `172.16.20.65` y DNS `172.16.10.125` |
+| `ping 172.16.20.132` | Responde, y confirma el camino hasta el servidor DHCP |
+| `ping 172.16.20.65` desde `AND-PC1` | Responde, y confirma el enrutamiento entre Ventas y Facturación |
+| `show running-config \| include helper-address` | Dos líneas con `ip helper-address 172.16.20.132` |
+
+Si algún PC no recibe IP, se revisa primero que el servicio DHCP esté en `On`, que el pool de esa VLAN tenga el `Default Gateway` correcto y que `show standby brief` muestre un activo para esa VLAN.
+
+---
+
+## Fase 6 · Prueba de conmutación de HSRP
+
+Esta prueba demuestra que el gateway de Ventas sigue respondiendo cuando falla la distribución activa. Se hace con `AND-PC1` ya con su IP por DHCP.
+
+En `AND-PC1`, en **Command Prompt**, se inicia un ping continuo hacia el gateway. Se detiene con `Ctrl + C`.
+
+```
+ping -t 172.16.20.1
+```
+
+Mientras el ping sigue corriendo, se simula la caída de `AND-DIST1` apagando todos sus puertos:
+
+AND-DIST1:
+```
+enable
+configure terminal
+interface range gigabitEthernet 1/0/1 - 4
+ shutdown
+end
+```
+
+Pasados unos diez segundos, se comprueba que `AND-DIST2` tomó todos los roles:
+
+AND-DIST2:
+```
+show standby brief
+```
+
+Resultado esperado: las VLAN 30, 40 y 50 aparecen en `Active` con `local`. En el ping continuo se pierden unos pocos paquetes y después vuelven las respuestas.
+
+Para restaurar `AND-DIST1`:
+
+AND-DIST1:
+```
+configure terminal
+interface range gigabitEthernet 1/0/1 - 4
+ no shutdown
+end
+show standby brief
+```
+
+Resultado esperado: como `AND-DIST1` tiene `preempt` con prioridad 110, recupera el rol `Active` en las VLAN 30 y 50, y `AND-DIST2` conserva el de la VLAN 40.
+
+---
