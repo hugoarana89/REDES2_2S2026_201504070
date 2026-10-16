@@ -1459,3 +1459,175 @@ En `show interfaces trunk`, la sección de VLANs en estado `forwarding` mostrar�
 
 ---
 
+## Fase 5 · Configuración de AndinaCom: SVIs, HSRP, STP y OSPF
+
+En esta fase se configuran las SVIs de usuario en las dos distribuciones, con HSRP para que el gateway de cada VLAN tenga una IP virtual y dos switches que puedan responder. También se fija el reparto de la raíz de Spanning Tree por VLAN y se activa OSPF en el core y las distribuciones.
+
+El reparto de roles es este: `AND-DIST1` es el HSRP activo y la raíz de STP en las VLAN 30 y 50, y `AND-DIST2` lo es en la VLAN 40. Así el tráfico de Facturación usa la otra distribución y la carga queda repartida.
+
+Los identificadores de router de OSPF para AndinaCom son `2.2.2.2` (`AND-CORE`), `2.2.2.3` (`AND-DIST1`) y `2.2.2.4` (`AND-DIST2`). El del core coincide con el que se usará después en BGP.
+
+---
+
+## Fase 5 · AND-DIST1
+
+AND-DIST1:
+```
+enable
+configure terminal
+interface vlan 30
+ ip address 172.16.20.2 255.255.255.192
+ standby 30 ip 172.16.20.1
+ standby 30 priority 110
+ standby 30 preempt
+ no shutdown
+exit
+interface vlan 40
+ ip address 172.16.20.66 255.255.255.192
+ standby 40 ip 172.16.20.65
+ no shutdown
+exit
+interface vlan 50
+ ip address 172.16.20.130 255.255.255.224
+ standby 50 ip 172.16.20.129
+ standby 50 priority 110
+ standby 50 preempt
+ no shutdown
+exit
+!
+spanning-tree vlan 30 root primary
+spanning-tree vlan 40 root secondary
+spanning-tree vlan 50 root primary
+!
+router ospf 1
+ router-id 2.2.2.3
+ passive-interface vlan 30
+ passive-interface vlan 40
+ passive-interface vlan 50
+ network 172.16.20.192 0.0.0.3 area 0
+ network 172.16.20.0 0.0.0.63 area 0
+ network 172.16.20.64 0.0.0.63 area 0
+ network 172.16.20.128 0.0.0.31 area 0
+end
+write memory
+```
+
+---
+
+## Fase 5 · AND-DIST2
+
+AND-DIST2:
+```
+enable
+configure terminal
+interface vlan 30
+ ip address 172.16.20.3 255.255.255.192
+ standby 30 ip 172.16.20.1
+ no shutdown
+exit
+interface vlan 40
+ ip address 172.16.20.67 255.255.255.192
+ standby 40 ip 172.16.20.65
+ standby 40 priority 110
+ standby 40 preempt
+ no shutdown
+exit
+interface vlan 50
+ ip address 172.16.20.131 255.255.255.224
+ standby 50 ip 172.16.20.129
+ no shutdown
+exit
+!
+spanning-tree vlan 30 root secondary
+spanning-tree vlan 40 root primary
+spanning-tree vlan 50 root secondary
+!
+router ospf 1
+ router-id 2.2.2.4
+ passive-interface vlan 30
+ passive-interface vlan 40
+ passive-interface vlan 50
+ network 172.16.20.196 0.0.0.3 area 0
+ network 172.16.20.0 0.0.0.63 area 0
+ network 172.16.20.64 0.0.0.63 area 0
+ network 172.16.20.128 0.0.0.31 area 0
+end
+write memory
+```
+
+---
+
+## Fase 5 · AND-CORE
+
+Los enlaces de fibra hacia los otros ISP no se incluyen en OSPF, porque se manejan con eBGP en la fase 9.
+
+AND-CORE:
+```
+enable
+configure terminal
+router ospf 1
+ router-id 2.2.2.2
+ network 172.16.20.192 0.0.0.3 area 0
+ network 172.16.20.196 0.0.0.3 area 0
+end
+write memory
+```
+
+---
+
+## Verificación de la fase 5 · AndinaCom
+
+Se espera cerca de un minuto después de aplicar las tres configuraciones, para que HSRP elija a su activo y Spanning Tree se reorganice.
+
+AND-DIST1:
+```
+show standby brief
+show ip interface brief | include Vlan
+show spanning-tree vlan 30
+show ip ospf neighbor
+```
+
+AND-DIST2:
+```
+show standby brief
+show spanning-tree vlan 40
+show ip ospf neighbor
+```
+
+AND-CORE:
+```
+show ip ospf neighbor
+show ip route ospf
+ping 172.16.20.1
+ping 172.16.20.65
+ping 172.16.20.129
+```
+
+AND-ACC1:
+```
+show spanning-tree vlan 30
+```
+
+AND-ACC2:
+```
+show spanning-tree vlan 40
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show standby brief` en `AND-DIST1` | VLAN 30 y 50 en `Active` con prioridad 110, y VLAN 40 en `Standby` con prioridad 100 |
+| `show standby brief` en `AND-DIST2` | VLAN 40 en `Active` con prioridad 110, y VLAN 30 y 50 en `Standby` con prioridad 100 |
+| `show ip interface brief` en `AND-DIST1` | `Vlan30`, `Vlan40`, `Vlan50` y `Vlan111` en `up/up` |
+| `show spanning-tree vlan 30` en `AND-DIST1` | Indica `This bridge is the root` |
+| `show spanning-tree vlan 40` en `AND-DIST2` | Indica `This bridge is the root` |
+| `show ip ospf neighbor` en `AND-CORE` | `2.2.2.3` y `2.2.2.4` en `FULL` |
+| `show ip route ospf` en `AND-CORE` | Rutas `172.16.20.0/26`, `172.16.20.64/26` y `172.16.20.128/27`, cada una por las dos distribuciones |
+| Pings desde `AND-CORE` a las IPs virtuales | Responden (el primer paquete puede perderse por el ARP) |
+| `show spanning-tree vlan 30` en `AND-ACC1` | El puerto raíz apunta a `Gi1/0/1` (hacia `AND-DIST1`) |
+| `show spanning-tree vlan 40` en `AND-ACC2` | El puerto raíz apunta a `Gi1/0/1` (hacia `AND-DIST2`) |
+
+El core aprende cada subred de usuario por las dos distribuciones, porque ambas la anuncian por OSPF. Eso es normal: reparte la carga entre las dos rutas, y el gateway que usan los equipos lo decide HSRP.
+
+---
