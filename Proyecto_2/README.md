@@ -1192,7 +1192,270 @@ Resultado esperado:
 | Navegador con `http://` | Muestra la página con los datos del estudiante |
 | Navegador con `https://` | Muestra la misma página |
 
-Si el navegador no abre el dominio pero el `nslookup` devuelve la IP correcta, el problema está en el navegador y no en la red, porque el guion bajo del dominio puede no gustarle. En ese caso se prueba con `http://172.16.10.125` para confirmar que el servicio web funciona.
+---
+
+## Fase 4 · Configuración de AndinaCom
+
+En esta fase se configuran los cinco switches de AndinaCom con las VLANs, los dos port-channels LACP hacia el core, las SVIs de tránsito, las troncales hacia los accesos y los puertos de acceso. Se usa el mismo patrón que funcionó en FibraNet: los puertos físicos del port-channel solo llevan `channel-group`, y el modo troncal con las VLANs permitidas se define únicamente en la interfaz `port-channel`.
+
+Las VLANs 30, 40 y 50 se crean en los cuatro switches de distribución y acceso, aunque cada acceso solo use una. Así los mensajes HSRP de la fase 5 tienen dos caminos entre `AND-DIST1` y `AND-DIST2`. Las SVIs de usuario, HSRP y OSPF se configuran en las fases 5 y 6, por lo que los PCs todavía no tendrán red.
+
+---
+
+## Fase 4 · AND-CORE
+
+AND-CORE:
+```
+enable
+configure terminal
+hostname AND-CORE
+no ip domain-lookup
+ip routing
+!
+vlan 111
+ name TRANSITO-C-D1
+vlan 112
+ name TRANSITO-C-D2
+exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 1 mode active
+exit
+interface range gigabitEthernet 1/0/3 - 4
+ channel-group 2 mode active
+exit
+!
+interface port-channel 1
+ switchport mode trunk
+ switchport trunk allowed vlan 111
+exit
+interface port-channel 2
+ switchport mode trunk
+ switchport trunk allowed vlan 112
+exit
+!
+interface vlan 111
+ ip address 172.16.20.193 255.255.255.252
+ no shutdown
+exit
+interface vlan 112
+ ip address 172.16.20.197 255.255.255.252
+ no shutdown
+end
+write memory
+```
+
+---
+
+## Fase 4 · AND-DIST1 y AND-DIST2
+
+`AND-DIST1` forma el `Po1` con el core, y sus puertos `Gi1/0/3` y `Gi1/0/4` son las troncales hacia `AND-ACC1` y `AND-ACC2`. `AND-DIST2` forma el `Po2` con el core (en este lado con los puertos `Gi1/0/1-2`), y sus puertos `Gi1/0/3` y `Gi1/0/4` son las troncales hacia `AND-ACC2` y `AND-ACC1`.
+
+AND-DIST1:
+```
+enable
+configure terminal
+hostname AND-DIST1
+no ip domain-lookup
+ip routing
+!
+vlan 30
+ name VENTAS
+vlan 40
+ name FACTURACION
+vlan 50
+ name SERVIDORES
+vlan 111
+ name TRANSITO-C-D1
+exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 1 mode active
+exit
+interface port-channel 1
+ switchport mode trunk
+ switchport trunk allowed vlan 111
+exit
+!
+interface vlan 111
+ ip address 172.16.20.194 255.255.255.252
+ no shutdown
+exit
+!
+interface range gigabitEthernet 1/0/3 - 4
+ switchport mode trunk
+ switchport trunk allowed vlan 30,40,50
+end
+write memory
+```
+
+AND-DIST2:
+```
+enable
+configure terminal
+hostname AND-DIST2
+no ip domain-lookup
+ip routing
+!
+vlan 30
+ name VENTAS
+vlan 40
+ name FACTURACION
+vlan 50
+ name SERVIDORES
+vlan 112
+ name TRANSITO-C-D2
+exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 2 mode active
+exit
+interface port-channel 2
+ switchport mode trunk
+ switchport trunk allowed vlan 112
+exit
+!
+interface vlan 112
+ ip address 172.16.20.198 255.255.255.252
+ no shutdown
+exit
+!
+interface range gigabitEthernet 1/0/3 - 4
+ switchport mode trunk
+ switchport trunk allowed vlan 30,40,50
+end
+write memory
+```
+
+---
+
+## Fase 4 · AND-ACC1 y AND-ACC2
+
+Los switches de acceso trabajan en capa 2, por lo que no llevan `ip routing`. `AND-ACC1` tiene sus troncales en `Gi1/0/1` (hacia `AND-DIST1`) y `Gi1/0/5` (hacia `AND-DIST2`), y los puertos de Ventas en `Gi1/0/2-4`. `AND-ACC2` tiene sus troncales en `Gi1/0/1` (hacia `AND-DIST2`) y `Gi1/0/5` (hacia `AND-DIST1`), los puertos de Facturación en `Gi1/0/2-3` y el servidor DHCP en `Gi1/0/4`.
+
+AND-ACC1:
+```
+enable
+configure terminal
+hostname AND-ACC1
+no ip domain-lookup
+!
+vlan 30
+ name VENTAS
+vlan 40
+ name FACTURACION
+vlan 50
+ name SERVIDORES
+exit
+!
+interface gigabitEthernet 1/0/1
+ switchport mode trunk
+ switchport trunk allowed vlan 30,40,50
+exit
+interface gigabitEthernet 1/0/5
+ switchport mode trunk
+ switchport trunk allowed vlan 30,40,50
+exit
+!
+interface range gigabitEthernet 1/0/2 - 4
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+end
+write memory
+```
+
+AND-ACC2:
+```
+enable
+configure terminal
+hostname AND-ACC2
+no ip domain-lookup
+!
+vlan 30
+ name VENTAS
+vlan 40
+ name FACTURACION
+vlan 50
+ name SERVIDORES
+exit
+!
+interface gigabitEthernet 1/0/1
+ switchport mode trunk
+ switchport trunk allowed vlan 30,40,50
+exit
+interface gigabitEthernet 1/0/5
+ switchport mode trunk
+ switchport trunk allowed vlan 30,40,50
+exit
+!
+interface range gigabitEthernet 1/0/2 - 3
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+exit
+interface gigabitEthernet 1/0/4
+ switchport mode access
+ switchport access vlan 50
+ spanning-tree portfast
+end
+write memory
+```
+
+El comando `spanning-tree portfast` muestra una advertencia en pantalla, y es normal. Si los puertos de un port-channel quedan en `I` o `s`, se revisa que los puertos físicos no tengan `switchport mode trunk` ni `switchport trunk allowed vlan`, porque esa configuración va solo en la interfaz `port-channel`.
+
+---
+
+## Verificación de la fase 4 · AndinaCom
+
+AND-CORE:
+```
+show etherchannel summary
+show interfaces trunk
+show ip interface brief
+ping 172.16.20.194
+ping 172.16.20.198
+```
+
+AND-DIST1:
+```
+show etherchannel summary
+show interfaces trunk
+ping 172.16.20.193
+```
+
+AND-DIST2:
+```
+show etherchannel summary
+show interfaces trunk
+ping 172.16.20.197
+```
+
+AND-ACC1:
+```
+show interfaces trunk
+show vlan brief
+```
+
+AND-ACC2:
+```
+show interfaces trunk
+show vlan brief
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show etherchannel summary` en CORE, DIST1 y DIST2 | `Po1` y `Po2` en `SU`, con los puertos en `(P)` |
+| `show interfaces trunk` en `AND-CORE` | `Po1` permite solo la VLAN 111 y `Po2` solo la VLAN 112 |
+| `show interfaces trunk` en las distribuciones | El `Po` correspondiente (VLAN 111 o 112) y `Gi1/0/3-4` con las VLAN 30, 40 y 50 |
+| `show interfaces trunk` en los accesos | `Gi1/0/1` y `Gi1/0/5` con las VLAN 30, 40 y 50 |
+| `show vlan brief` en `AND-ACC1` | `Gi1/0/2-4` en la VLAN 30 |
+| `show vlan brief` en `AND-ACC2` | `Gi1/0/2-3` en la VLAN 40 y `Gi1/0/4` en la VLAN 50 |
+| Pings entre el core y las distribuciones | Responden (el primer paquete puede perderse por el ARP) |
+
+En `show interfaces trunk`, la sección de VLANs en estado `forwarding` mostrará menos VLANs en algunas troncales de los accesos. Es normal: Spanning Tree bloquea uno de los dos caminos de cada VLAN para evitar el bucle entre las distribuciones y los accesos.
 
 ---
 
