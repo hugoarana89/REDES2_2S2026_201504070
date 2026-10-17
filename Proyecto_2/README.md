@@ -621,7 +621,9 @@ La configuración se hace por fases, una a la vez, y cada fase se verifica antes
 
 ---
 
-## Configuración de hostname
+## Configuración de los componentes
+
+### Configuración de hostname
 
 FIB-CORE:
 ```
@@ -763,7 +765,9 @@ end
 write memory
 ```
 
-## Fase 1 · Configuración de FibraNet GT
+### Fase 1
+
+#### Fase 1 · Configuración de FibraNet GT
 
 La agregación de enlaces se configura en dos pasos: los puertos físicos solo reciben `channel-group`, y el modo troncal con la VLAN permitida se define únicamente en la interfaz `port-channel`. El comando `switchport trunk encapsulation dot1q` no existe en el 3650-24PS de Packet Tracer, por lo que no se utiliza.
 
@@ -932,7 +936,7 @@ Si los puertos de un port-channel quedan en `I` o `s`, o aparece el mensaje `vla
 
 ---
 
-## Verificación de la fase 1 · FibraNet GT
+#### Verificación de la fase 1 · FibraNet GT
 
 FIB-CORE:
 ```
@@ -963,11 +967,50 @@ Resultado esperado:
 |:--|:--|
 | `show etherchannel summary` | `Po1` y `Po2` en `SU`, y cada puerto miembro con la marca `P` |
 | `show interfaces trunk` | `Po1` permite solo la VLAN 101 y `Po2` solo la VLAN 102 |
-| `show ip interface brief` | `Vlan101` y `Vlan102` en `up/up` según el extremo, y los puertos enrutados con su IP |
+| `show ip interface brief` | `Vlan101` y `Vlan102` en `up/up`, y los puertos enrutados con su IP |
 | Pings | Responden (el primer paquete puede perderse por el ARP) |
 
+#### Fase 1 · Capturas de pantalla de pruebas de funcionalidad
 
-## Fase 2 · SVIs gateway y OSPF en FibraNet GT
+1. **Estado de los port-channels en `FIB-CORE`.** En el dispositivo `FIB-CORE` se ejecutó el comando `show etherchannel summary`.
+
+<div align="center">
+  <img src="img/fase1_1.avif" alt="Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gig1/0/1-4` marcados con `P`" width="100%">
+  <p>Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gig1/0/1-4` marcados con `P`</p>
+</div>
+
+2. **Troncales en `FIB-CORE`.** En el mismo equipo se ejecutó el comando `show interfaces trunk`.
+
+<div align="center">
+  <img src="img/fase1_2.avif" alt=" Se observa que `Po1` permite únicamente la VLAN 101 y `Po2` la VLAN 102" width="100%">
+  <p>Se observa que `Po1` permite únicamente la VLAN 101 y `Po2` la VLAN 102</p>
+</div>
+
+3. **Port-channels en las distribuciones.** En `FIB-DIST1` y en `FIB-DIST2` se ejecutó el comando `show etherchannel summary`.
+
+<div align="center">
+  <img src="img/fase1_3.avif" alt="Se adjuntan ambas pantallas, con `Po1` en `FIB-DIST1` y `Po2` en `FIB-DIST2` en `SU` y sus puertos en `P`" width="100%">
+  <p>Se adjuntan ambas pantallas, con `Po1` en `FIB-DIST1` y `Po2` en `FIB-DIST2` en `SU` y sus puertos en `P`</p>
+</div>
+
+4. **Estado de las interfaces.** En `FIB-CORE` se ejecutó el comando `show ip interface brief | include Vlan`.
+
+<div align="center">
+  <img src="img/fase1_4.avif" alt="Se muestran `Vlan101` y `Vlan102` en `up/up` con sus direcciones IP" width="100%">
+  <p>Se muestran `Vlan101` y `Vlan102` en `up/up` con sus direcciones IP</p>
+</div>
+
+5. **Pings de los enlaces de tránsito.** Desde `FIB-CORE` se ejecutaron `ping 192.168.70.18` y `ping 192.168.70.22`; desde `FIB-DIST1`, `ping 192.168.70.26`; y desde `FIB-DIST2`, `ping 192.168.70.30`.
+
+<div align="center">
+  <img src="img/fase1_5.avif" alt="Se muestran las respuestas de cada ping; el primer paquete puede perderse por el ARP" width="100%">
+  <p>Se muestran las respuestas de cada ping; el primer paquete puede perderse por el ARP</p>
+</div>
+
+
+### Fase 2
+
+#### Fase 2 · SVIs gateway y OSPF en FibraNet GT
 
 `FIB-ACC1` y `FIB-ACC2` actúan como gateways de los dos departamentos con una SVI cada uno. Los cinco switches de FibraNet GT forman el área 0 de OSPF; los enlaces de fibra hacia los otros ISP no participan en OSPF, porque se manejan con eBGP. Las SVIs de usuario se declaran pasivas.
 
@@ -1043,7 +1086,7 @@ router ospf 1
 write memory
 ```
 
-## Verificación de la fase 2 · FibraNet GT
+#### Verificación de la fase 2 · FibraNet GT
 
 FIB-CORE:
 ```
@@ -1068,7 +1111,47 @@ Resultado esperado:
 | `Vlan10` y `Vlan20` | En `up/up` |
 | Pings entre gateways | Responden (el primer paquete puede perderse por el ARP) |
 
-## Fase 3 · Configuración de IP estática en FIB-SRV
+#### Fase 2 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Vecinos OSPF en el core.** En `FIB-CORE` se ejecutó el comando `show ip ospf neighbor`.
+
+<div align="center">
+  <img src="img/fase2_1.avif" alt="Se aprecian `FIB-DIST1` y `FIB-DIST2` en estado `FULL`" width="100%">
+  <p>Se aprecian `FIB-DIST1` y `FIB-DIST2` en estado `FULL`</p>
+</div>
+
+2. **Vecinos OSPF en las distribuciones.** En `FIB-DIST1` y en `FIB-DIST2` se ejecutó el mismo comando.
+
+<div align="center">
+  <img src="img/fase2_2.avif" alt="Se adjuntan ambas pantallas, con el switch de acceso y el core en estado `FULL`" width="100%">
+  <p>Se adjuntan ambas pantallas, con el switch de acceso y el core en estado `FULL`</p>
+</div>
+
+3. **Rutas aprendidas por OSPF.** En `FIB-CORE` se ejecutó el comando `show ip route ospf`.
+
+<div align="center">
+  <img src="img/fase2_3.avif" alt="Se muestran las rutas `172.16.10.0/25` y `172.16.10.128/25`, cada una por su distribución" width="100%">
+  <p>Se muestran las rutas `172.16.10.0/25` y `172.16.10.128/25`, cada una por su distribución</p>
+</div>
+
+4. **Estado de la SVI y ping entre gateways.** En `FIB-ACC1` se ejecutó `show ip interface brief | include Vlan` y luego `ping 172.16.10.129`.
+
+<div align="center">
+  <img src="img/fase2_4.avif" alt="Se observa `Vlan10` en `up/up` y las respuestas del ping hacia el gateway de la otra VLAN" width="100%">
+  <p>Se observa `Vlan10` en `up/up` y las respuestas del ping hacia el gateway de la otra VLAN</p>
+</div>
+
+5. **Pings desde el core a los gateways.** En `FIB-CORE` se ejecutaron `ping 172.16.10.1` y `ping 172.16.10.129`.
+
+<div align="center">
+  <img src="img/fase2_5.avif" alt="Se muestran las respuestas de ambos pings" width="100%">
+  <p>Se muestran las respuestas de ambos pings</p>
+</div>
+
+
+### Fase 3
+
+#### Fase 3 · Configuración de IP estática en FIB-SRV
 
 El servidor `FIB-SRV` se configura desde la interfaz gráfica de Packet Tracer. Se hace clic sobre el servidor, se abre la pestaña **Config** y se entra a **FastEthernet0**, en la sección **INTERFACE**.
 
@@ -1090,7 +1173,7 @@ El servidor usa su propia dirección como servidor DNS, porque es el equipo que 
 
 ---
 
-## Fase 3 · Configuración del servicio DNS
+#### Fase 3 · Configuración del servicio DNS
 
 En la pestaña **Services** del servidor se selecciona **DNS** y se registra el dominio del proyecto.
 
@@ -1105,7 +1188,7 @@ Se pulsa **Add** y el registro debe aparecer en la lista de la parte inferior.
 
 ---
 
-## Fase 3 · Configuración de los servicios HTTP y HTTPS
+#### Fase 3 · Configuración de los servicios HTTP y HTTPS
 
 En la pestaña **Services** se selecciona **HTTP** y se activan ambos protocolos.
 
@@ -1146,7 +1229,7 @@ Las letras con tilde se escriben como entidades HTML (`&oacute;`, `&eacute;`), p
 
 ---
 
-## Fase 3 · Preparación de los PCs de prueba
+#### Fase 3 · Preparación de los PCs de prueba
 
 Como DHCP todavía no funciona entre ISPs, se usan dos PCs de FibraNet con una IP estática temporal. Las direcciones se eligen fuera de los pools de DHCP, o dentro del rango que se revierte después. En cada PC se abre **Desktop**, **IP Configuration**, y se selecciona **Static**.
 
@@ -1159,7 +1242,7 @@ Estas direcciones son solo para la prueba, y los dos PCs deben volver a **DHCP**
 
 ---
 
-## Verificación de la fase 3 · FibraNet GT
+#### Verificación de la fase 3 · FibraNet GT
 
 En `FIB-PC1`, en **Desktop**, **Command Prompt**:
 
@@ -1192,9 +1275,70 @@ Resultado esperado:
 | Navegador con `http://` | Muestra la página con los datos del estudiante |
 | Navegador con `https://` | Muestra la misma página |
 
+
+#### Fase 3 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **IP estática de `FIB-SRV`.** En `FIB-SRV`, en la pestaña **Config**, se abrió **FastEthernet0** y la sección **Settings** (global).
+
+<div align="center">
+  <img src="img/fase3_1.avif" alt="Captura pendiente: Se aprecian la dirección `172.16.10.125`, la máscara, el gateway `172.16.10.1` y el servidor DNS" width="100%">
+  <p>Se aprecian la dirección `172.16.10.125`, la máscara, el gateway `172.16.10.1` y el servidor DNS</p>
+</div>
+
+2. **Servicio DNS.** En `FIB-SRV`, en **Services**, **DNS**, se activó el servicio y se agregó el registro.
+
+<div align="center">
+  <img src="img/fase3_2.avif" alt="Se muestra el registro de tipo A de `www.proyecto2_201504070.com` hacia `172.16.10.125`" width="100%">
+  <p>Se muestra el registro de tipo A de `www.proyecto2_201504070.com` hacia `172.16.10.125`</p>
+</div>
+
+3. **Servicios HTTP y HTTPS.** En `FIB-SRV`, en **Services**, **HTTP**, se activaron ambos servicios y se editó `index.html`.
+
+<div align="center">
+  <img src="img/fase3_3.avif" alt="Se aprecian HTTP y HTTPS en `On` y el contenido de la página con los datos del estudiante" width="100%">
+  <p>Se aprecian HTTP y HTTPS en `On` y el contenido de la página con los datos del estudiante</p>
+</div>
+
+4. **IP estática de los PCs de prueba.** En `FIB-PC1` y en `FIB-PC4` se abrió **Desktop**, **IP Configuration**.
+
+<div align="center">
+  <img src="img/fase3_4.avif" alt="Se adjuntan ambas pantallas, con las direcciones, el gateway y el servidor DNS de cada PC" width="100%">
+  <p>Se adjuntan ambas pantallas, con las direcciones, el gateway y el servidor DNS de cada PC</p>
+</div>
+
+5. **Ping y resolución DNS desde `FIB-PC1`.** En **Command Prompt** se ejecutaron `ping 172.16.10.125` y `nslookup www.proyecto2_201504070.com`.
+
+<div align="center">
+  <img src="img/fase3_5.avif" alt="Se muestran las respuestas del ping y la resolución del dominio a `172.16.10.125`" width="100%">
+  <p>Se muestran las respuestas del ping y la resolución del dominio a `172.16.10.125`</p>
+</div>
+
+6. **Ping y resolución DNS desde `FIB-PC4`.** Se repitieron los mismos comandos desde la otra VLAN.
+
+<div align="center">
+  <img src="img/fase3_6.avif" alt="Se confirma el enrutamiento entre las dos VLAN de FibraNet GT" width="100%">
+  <p>Se confirma el enrutamiento entre las dos VLAN de FibraNet GT</p>
+</div>
+
+7. **Acceso por HTTP.** En **Web Browser** de `FIB-PC1` y de `FIB-PC4` se abrió `http://www.proyecto2_201504070.com`.
+
+<div align="center">
+  <img src="img/fase3_7.avif" alt="Se muestra la página con los datos del estudiante en ambos PCs" width="100%">
+  <p>Se muestra la página con los datos del estudiante en ambos PCs</p>
+</div>
+
+8. **Acceso por HTTPS.** En el mismo navegador se abrió `https://www.proyecto2_201504070.com`.
+
+<div align="center">
+  <img src="img/fase3_8.avif" alt="Captura pendiente: Se muestra la misma página cargada por HTTPS en ambos PCs" width="100%">
+  <p>Se muestra la misma página cargada por HTTPS en ambos PCs</p>
+</div>
+
 ---
 
-## Fase 4 · Configuración de AndinaCom
+### Fase 4
+
+#### Fase 4 · Configuración de AndinaCom
 
 En esta fase se configuran los cinco switches de AndinaCom con las VLANs, los dos port-channels LACP hacia el core, las SVIs de tránsito, las troncales hacia los accesos y los puertos de acceso. Se usa el mismo patrón que funcionó en FibraNet: los puertos físicos del port-channel solo llevan `channel-group`, y el modo troncal con las VLANs permitidas se define únicamente en la interfaz `port-channel`.
 
@@ -1202,7 +1346,7 @@ Las VLANs 30, 40 y 50 se crean en los cuatro switches de distribución y acceso,
 
 ---
 
-## Fase 4 · AND-CORE
+#### Fase 4 · AND-CORE
 
 AND-CORE:
 ```
@@ -1247,7 +1391,7 @@ write memory
 
 ---
 
-## Fase 4 · AND-DIST1 y AND-DIST2
+#### Fase 4 · AND-DIST1 y AND-DIST2
 
 `AND-DIST1` forma el `Po1` con el core, y sus puertos `Gi1/0/3` y `Gi1/0/4` son las troncales hacia `AND-ACC1` y `AND-ACC2`. `AND-DIST2` forma el `Po2` con el core (en este lado con los puertos `Gi1/0/1-2`), y sus puertos `Gi1/0/3` y `Gi1/0/4` son las troncales hacia `AND-ACC2` y `AND-ACC1`.
 
@@ -1329,7 +1473,7 @@ write memory
 
 ---
 
-## Fase 4 · AND-ACC1 y AND-ACC2
+#### Fase 4 · AND-ACC1 y AND-ACC2
 
 Los switches de acceso trabajan en capa 2, por lo que no llevan `ip routing`. `AND-ACC1` tiene sus troncales en `Gi1/0/1` (hacia `AND-DIST1`) y `Gi1/0/5` (hacia `AND-DIST2`), y los puertos de Ventas en `Gi1/0/2-4`. `AND-ACC2` tiene sus troncales en `Gi1/0/1` (hacia `AND-DIST2`) y `Gi1/0/5` (hacia `AND-DIST1`), los puertos de Facturación en `Gi1/0/2-3` y el servidor DHCP en `Gi1/0/4`.
 
@@ -1406,7 +1550,7 @@ El comando `spanning-tree portfast` muestra una advertencia en pantalla, y es no
 
 ---
 
-## Verificación de la fase 4 · AndinaCom
+#### Verificación de la fase 4 · AndinaCom
 
 AND-CORE:
 ```
@@ -1457,9 +1601,56 @@ Resultado esperado:
 
 En `show interfaces trunk`, la sección de VLANs en estado `forwarding` mostrará menos VLANs en algunas troncales de los accesos. Es normal: Spanning Tree bloquea uno de los dos caminos de cada VLAN para evitar el bucle entre las distribuciones y los accesos.
 
+
+#### Fase 4 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Port-channels en el core.** En `AND-CORE` se ejecutó el comando `show etherchannel summary`.
+
+<div align="center">
+  <img src="img/fase4_1.avif" alt="Se aprecian `Po1` y `Po2` en `SU`, con sus puertos marcados con `P`" width="100%">
+  <p>Se aprecian `Po1` y `Po2` en `SU`, con sus puertos marcados con `P`</p>
+</div>
+
+2. **Troncales en el core.** En `AND-CORE` se ejecutó el comando `show interfaces trunk`.
+
+<div align="center">
+  <img src="img/fase4_2.avif" alt="Se observa que `Po1` permite solo la VLAN 111 y `Po2` solo la VLAN 112" width="100%">
+  <p>Se observa que `Po1` permite solo la VLAN 111 y `Po2` solo la VLAN 112</p>
+</div>
+
+3. **Port-channels y troncales en las distribuciones.** En `AND-DIST1` y en `AND-DIST2` se ejecutaron `show etherchannel summary` y `show interfaces trunk`.
+
+<div align="center">
+  <img src="img/fase4_3.avif" alt="Se adjuntan ambas pantallas, con el `Po` en `SU` y las troncales hacia los accesos con las VLAN 30, 40 y 50" width="100%">
+  <p>Se adjuntan ambas pantallas, con el `Po` en `SU` y las troncales hacia los accesos con las VLAN 30, 40 y 50</p>
+</div>
+
+4. **Interfaces y pings del core.** En `AND-CORE` se ejecutaron `show ip interface brief | include Vlan`, `ping 172.16.20.194` y `ping 172.16.20.198`.
+
+<div align="center">
+  <img src="img/fase4_4.avif" alt="Se muestran las SVIs de tránsito en `up/up` y las respuestas de ambos pings" width="100%">
+  <p>Se muestran las SVIs de tránsito en `up/up` y las respuestas de ambos pings</p>
+</div>
+
+5. **Troncales y VLANs en `AND-ACC1`.** En `AND-ACC1` se ejecutaron `show interfaces trunk` y `show vlan brief`.
+
+<div align="center">
+  <img src="img/fase4_5.avif" alt="Se aprecian las troncales `Gi1/0/1` y `Gi1/0/5` y los puertos `Gi1/0/2-4` en la VLAN 30" width="100%">
+  <p>Se aprecian las troncales `Gi1/0/1` y `Gi1/0/5` y los puertos `Gi1/0/2-4` en la VLAN 30</p>
+</div>
+
+6. **Troncales y VLANs en `AND-ACC2`.** En `AND-ACC2` se ejecutaron los mismos comandos.
+
+<div align="center">
+  <img src="img/fase4_6.avif" alt="Se aprecian las troncales y los puertos `Gi1/0/2-3` en la VLAN 40 y `Gi1/0/4` en la VLAN 50" width="100%">
+  <p>Se aprecian las troncales y los puertos `Gi1/0/2-3` en la VLAN 40 y `Gi1/0/4` en la VLAN 50</p>
+</div>
+
 ---
 
-## Fase 5 · Configuración de AndinaCom: SVIs, HSRP, STP y OSPF
+### Fase 5
+
+#### Fase 5 · Configuración de AndinaCom: SVIs, HSRP, STP y OSPF
 
 En esta fase se configuran las SVIs de usuario en las dos distribuciones, con HSRP para que el gateway de cada VLAN tenga una IP virtual y dos switches que puedan responder. También se fija el reparto de la raíz de Spanning Tree por VLAN y se activa OSPF en el core y las distribuciones.
 
@@ -1469,7 +1660,7 @@ Los identificadores de router de OSPF para AndinaCom son `2.2.2.2` (`AND-CORE`),
 
 ---
 
-## Fase 5 · AND-DIST1
+#### Fase 5 · AND-DIST1
 
 AND-DIST1:
 ```
@@ -1514,7 +1705,7 @@ write memory
 
 ---
 
-## Fase 5 · AND-DIST2
+#### Fase 5 · AND-DIST2
 
 AND-DIST2:
 ```
@@ -1557,7 +1748,7 @@ write memory
 
 ---
 
-## Fase 5 · AND-CORE
+#### Fase 5 · AND-CORE
 
 Los enlaces de fibra hacia los otros ISP no se incluyen en OSPF, porque se manejan con eBGP en la fase 9.
 
@@ -1575,7 +1766,7 @@ write memory
 
 ---
 
-## Verificación de la fase 5 · AndinaCom
+#### Verificación de la fase 5 · AndinaCom
 
 Se espera cerca de un minuto después de aplicar las tres configuraciones, para que HSRP elija a su activo y Spanning Tree se reorganice.
 
@@ -1630,9 +1821,63 @@ Resultado esperado:
 
 El core aprende cada subred de usuario por las dos distribuciones, porque ambas la anuncian por OSPF. Eso es normal: reparte la carga entre las dos rutas, y el gateway que usan los equipos lo decide HSRP.
 
+
+#### Fase 5 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **HSRP en `AND-DIST1`.** En `AND-DIST1` se ejecutó el comando `show standby brief`.
+
+<div align="center">
+  <img src="img/fase5_1.avif" alt="Se aprecian las VLAN 30 y 50 en `Active` con prioridad 110, y la VLAN 40 en `Standby`" width="100%">
+  <p>Se aprecian las VLAN 30 y 50 en `Active` con prioridad 110, y la VLAN 40 en `Standby`</p>
+</div>
+
+2. **HSRP en `AND-DIST2`.** En `AND-DIST2` se ejecutó el comando `show standby brief`.
+
+<div align="center">
+  <img src="img/fase5_2.avif" alt="Se aprecia la VLAN 40 en `Active` con prioridad 110, y las VLAN 30 y 50 en `Standby`" width="100%">
+  <p>Se aprecia la VLAN 40 en `Active` con prioridad 110, y las VLAN 30 y 50 en `Standby`</p>
+</div>
+
+3. **Estado de las SVIs en `AND-DIST1`.** En `AND-DIST1` se ejecutó `show ip interface brief`.
+
+<div align="center">
+  <img src="img/fase5_3.avif" alt="Se muestran `Vlan30`, `Vlan40`, `Vlan50` y `Vlan111` en `up/up`" width="100%">
+  <p>Se muestran `Vlan30`, `Vlan40`, `Vlan50` y `Vlan111` en `up/up`</p>
+</div>
+
+4. **Raíz de Spanning Tree en las distribuciones.** En `AND-DIST1` se ejecutó `show spanning-tree vlan 30` y en `AND-DIST2`, `show spanning-tree vlan 40`.
+
+<div align="center">
+  <img src="img/fase5_4.avif" alt="Se adjuntan ambas pantallas, con el mensaje `This bridge is the root` en cada una" width="100%">
+  <p>Se adjuntan ambas pantallas, con el mensaje `This bridge is the root` en cada una</p>
+</div>
+
+5. **Puerto raíz en los accesos.** En `AND-ACC1` se ejecutó `show spanning-tree vlan 30` y en `AND-ACC2`, `show spanning-tree vlan 40`.
+
+<div align="center">
+  <img src="img/fase5_5.avif" alt="Se observa el puerto raíz `Gi1/0/1` hacia la distribución correspondiente" width="100%">
+  <p>Se observa el puerto raíz `Gi1/0/1` hacia la distribución correspondiente</p>
+</div>
+
+6. **OSPF en el core.** En `AND-CORE` se ejecutaron `show ip ospf neighbor` y `show ip route ospf`.
+
+<div align="center">
+  <img src="img/fase5_6.avif" alt="Se aprecian `2.2.2.3` y `2.2.2.4` en `FULL` y las tres subredes de usuario aprendidas por ambas distribuciones" width="100%">
+  <p>Se aprecian `2.2.2.3` y `2.2.2.4` en `FULL` y las tres subredes de usuario aprendidas por ambas distribuciones</p>
+</div>
+
+7. **Pings a las IPs virtuales.** En `AND-CORE` se ejecutaron `ping 172.16.20.1`, `ping 172.16.20.65` y `ping 172.16.20.129`.
+
+<div align="center">
+  <img src="img/fase5_7.avif" alt="Se muestran las respuestas de los tres pings a las IPs virtuales de HSRP" width="100%">
+  <p>Se muestran las respuestas de los tres pings a las IPs virtuales de HSRP</p>
+</div>
+
 ---
 
-## Fase 6 · Configuración de IP estática en AND-DHCP
+### Fase 6
+
+#### Fase 6 · Configuración de IP estática en AND-DHCP
 
 El servidor `AND-DHCP` se configura desde la interfaz gráfica de Packet Tracer. Se hace clic sobre el servidor, se abre la pestaña **Config** y se entra a **FastEthernet0**, en la sección **INTERFACE**.
 
@@ -1654,7 +1899,7 @@ El gateway es la IP virtual de HSRP de la VLAN 50, de modo que el servidor sigue
 
 ---
 
-## Fase 6 · Configuración de los pools de DHCP
+#### Fase 6 · Configuración de los pools de DHCP
 
 En la pestaña **Services** del servidor se selecciona **DHCP** y se activa el servicio (**Service**, **On**). Luego se crean los siete pools, uno por VLAN de usuario de los tres ISP.
 
@@ -1674,7 +1919,7 @@ Los rangos dejan fuera las IPs de los gateways, las reales de HSRP, el rango de 
 
 ---
 
-## Fase 6 · Configuración del relay DHCP en AndinaCom
+#### Fase 6 · Configuración del relay DHCP en AndinaCom
 
 Las VLAN 30 y 40 reenvían las peticiones DHCP de los hosts hacia el servidor, que vive en otra subred (VLAN 50). Se configura en las dos distribuciones, porque cualquiera de las dos puede estar activa en HSRP. La VLAN 50 no lleva relay.
 
@@ -1706,7 +1951,7 @@ write memory
 
 ---
 
-## Fase 6 · Configuración de los PCs de AndinaCom en DHCP
+#### Fase 6 · Configuración de los PCs de AndinaCom en DHCP
 
 En cada uno de los cinco PCs se abre **Desktop**, **IP Configuration**, y se selecciona **DHCP**.
 
@@ -1717,7 +1962,7 @@ En cada uno de los cinco PCs se abre **Desktop**, **IP Configuration**, y se sel
 
 ---
 
-## Verificación de la fase 6 · AndinaCom
+#### Verificación de la fase 6 · AndinaCom
 
 En `AND-PC1` y en `AND-PC4`, en **Desktop**, **Command Prompt**:
 
@@ -1751,7 +1996,7 @@ Si algún PC no recibe IP, se revisa primero que el servicio DHCP esté en `On`,
 
 ---
 
-## Fase 6 · Prueba de conmutación de HSRP
+#### Fase 6 · Prueba de conmutación de HSRP
 
 Esta prueba demuestra que el gateway de Ventas sigue respondiendo cuando falla la distribución activa. Se hace con `AND-PC1` ya con su IP por DHCP.
 
@@ -1795,3 +2040,89 @@ show standby brief
 Resultado esperado: como `AND-DIST1` tiene `preempt` con prioridad 110, recupera el rol `Active` en las VLAN 30 y 50, y `AND-DIST2` conserva el de la VLAN 40.
 
 ---
+
+#### Fase 6 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Relay en `AND-DIST2`.** En el dispositivo `AND-DIST2` se ejecutó el comando `show running-config | include helper-address`, verificando la visualización de dos líneas con la dirección `172.16.20.132`.
+
+<div align="center">
+  <img src="img/fase6_1.avif" alt="" width="100%">
+  <p>Salida del comando en el switch</p>
+</div>
+
+2. **DHCP en los otros tres PCs.** En los equipos `AND-PC2`, `AND-PC3` y `AND-PC5` se estableció la opción **DHCP** en el apartado de **IP Configuration** y posteriormente se ejecutó el comando `ipconfig /all` en el **Command Prompt**.
+
+<div align="center">
+  <img src="img/fase6_2.avif" alt="" width="100%">
+  <p>Se incluye una captura por cada equipo donde se aprecian la dirección IP, el gateway, el servidor DHCP y el DNS</p>
+</div>
+
+3. **Comunicación entre Ventas y Facturación.** Desde `AND-PC1` se ejecutó un `ping 172.16.20.65` (correspondiente a `AND-PC4`).
+
+<div align="center">
+  <img src="img/fase6_3.avif" alt="" width="100%">
+  <p>Se muestra la correcta recepción de las respuestas del ping</p>
+</div>
+
+4. **Estado de HSRP antes de la falla.** En los equipos `AND-DIST1` y `AND-DIST2` se ingresó el comando `show standby brief`.
+
+<div align="center">
+  <img src="img/fase6_4.avif" alt="" width="100%">
+  <p>Se adjuntan ambas pantallas para identificar el dispositivo que opera como `Active` en cada VLAN.</p>
+</div>
+
+5. **Ping continuo.** En `AND-PC1` se inició una ejecución continua del comando `ping -t 172.16.20.1`, manteniéndose en curso.
+
+<div align="center">
+  <img src="img/fase6_5.avif" alt="" width="100%">
+  <p>Salida del ping</p>
+</div>
+
+6. **Falla de `AND-DIST1`.** En el equipo `AND-DIST1` se procedió a apagar los puertos mediante la siguiente secuencia de comandos:
+```text
+enable
+configure terminal
+interface range gigabitEthernet 1/0/1 - 4
+shutdown
+end
+
+```
+<div align="center">
+  <img src="img/fase6_6.avif" alt="" width="100%">
+  <p>Se apago los puertos del switch</p>
+</div>
+
+7. **Cambio de HSRP.** Tras un intervalo aproximado de diez segundos, se consultó el estado en `AND-DIST2` con el comando `show standby brief`, comprobando que las tres VLAN figuraran como `Active` con el estado `local`.
+
+<div align="center">
+  <img src="img/fase6_7.avif" alt="" width="100%">
+  <p>Pantalla del equipo `AND-DIST2`</p>
+</div>
+
+8. **El ping sobrevive.** En `AND-PC1` se detuvo la ejecución del ping mediante la combinación `Ctrl + C`, registrándose un número reducido de paquetes perdidos previo a la recuperación de las respuestas.
+
+<div align="center">
+  <img src="img/fase6_8.avif" alt="" width="100%">
+  <p>Pantalla del equipo `AND-PC1` con el historial del ping y el resumen correspondiente`</p>
+</div>
+
+9. **Recuperación.** En `AND-DIST1` se reactivaron los puertos y se validó el funcionamiento mediante los siguientes comandos:
+```text
+configure terminal
+interface range gigabitEthernet 1/0/1 - 4
+no shutdown
+end
+show standby brief
+
+```
+<div align="center">
+  <img src="img/fase6_9.avif" alt="" width="100%">
+  <p>Reactivación de puertos`</p>
+</div>
+
+10. Tras estas acciones, `AND-DIST1` retomó el rol `Active` en las VLAN 30 y 50.
+
+<div align="center">
+  <img src="img/fase6_10.avif" alt="" width="100%">
+  <p>Salida del comando `show standby brief` en `AND-DIST1``</p>
+</div>
