@@ -604,8 +604,8 @@ La configuración se hace por fases, una a la vez, y cada fase se verifica antes
 | 6 | `AND-DHCP`: IP estática y los 7 pools; `ip helper-address` en las SVIs de AndinaCom | DHCP DORA en los PCs de AndinaCom, y prueba de conmutación HSRP apagando `AND-DIST1` | Hecho |
 | 7 | MoonLink: VLANs, LACP (`Po1` y `Po2`), SVIs, puerto enrutado a SP3, accesos y EIGRP AS 10 | `show ip eigrp neighbors`, ping entre gateways | Hecho |
 | 8 | MoonLink: WRT300N en modo puente (DHCP apagado, IP de gestión, SSID y WPA2) y asociación de la laptop | La laptop se asocia al SSID | Hecho |
-| 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Pendiente |
-| 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | Pendiente |
+| 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Hecho |
+| 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | hecho |
 | 11 | ACLs extendidas por departamento (orden de reglas y tabla 4.2) | Matriz de ping y acceso web entre todos los pares de departamentos | Pendiente |
 | 12 | Guardado final (`write memory`), archivo `.pkt`, capturas y pruebas para el manual | Reinicio de dispositivos y revisión de que todo persiste | Pendiente |
 | 13 | Captura en Wireshark desde una VM (TCP handshake, DNS, HTTP/HTTPS, ICMP) | Archivo `.pcapng` abre en Wireshark | Pendiente |
@@ -2854,6 +2854,231 @@ Los pings se hacen desde equipos de usuario y no desde los cores, porque las dir
 <div align="center">
   <img src="img/fase9_7.avif" alt="Se muestran la resolución del dominio desde AndinaCom y la página cargada desde MoonLink" width="100%">
   <p>Se muestran la resolución del dominio desde AndinaCom y la página cargada desde MoonLink</p>
+</div>
+
+---
+
+### Fase 10
+
+#### Fase 10 · Configuración del relay DHCP en FibraNet GT y MoonLink
+
+El servidor `AND-DHCP` (`172.16.20.132`) entrega direcciones a los tres ISP. Los equipos de FibraNet GT y MoonLink están en otras redes, por lo que el switch que actúa como gateway de cada VLAN debe reenviar sus peticiones al servidor con `ip helper-address`. En AndinaCom el relay ya está configurado desde la fase 6, y la VLAN 50 no lleva relay porque el servidor vive en esa subred.
+
+Para que la petición llegue y la respuesta regrese, hace falta la comunicación entre ISPs de la fase 9: el servidor responde a la dirección de la SVI que hizo el relay, y esa ruta ya la conocen `AND-CORE` y las distribuciones por la redistribución de BGP.
+
+| Dispositivo | SVI | Departamento |
+|:--|:--:|:--|
+| `FIB-ACC1` | VLAN 10 | Administración |
+| `FIB-ACC2` | VLAN 20 | Atención al Cliente |
+| `MOO-SP1` | VLAN 60 | Soporte |
+| `MOO-SP2` | VLAN 70 | Seguridad |
+| `MOO-SP3` | VLAN 80 | Soporte Wi-Fi |
+
+---
+
+#### Fase 10 · FibraNet GT
+
+FIB-ACC1:
+```
+enable
+configure terminal
+interface vlan 10
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+FIB-ACC2:
+```
+enable
+configure terminal
+interface vlan 20
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+---
+
+#### Fase 10 · MoonLink
+
+MOO-SP1:
+```
+enable
+configure terminal
+interface vlan 60
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+MOO-SP2:
+```
+enable
+configure terminal
+interface vlan 70
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+MOO-SP3:
+```
+enable
+configure terminal
+interface vlan 80
+ ip helper-address 172.16.20.132
+end
+write memory
+```
+
+---
+
+#### Fase 10 · Configuración de los equipos de usuario en DHCP
+
+Se deja en DHCP cada uno de los 14 equipos de usuario de FibraNet y MoonLink, y se revierten las tres direcciones estáticas temporales de las fases 3 y 8. En cada equipo se abre **Desktop**, **IP Configuration**, y se selecciona **DHCP**.
+
+| Equipo | VLAN | Estado anterior | Acción |
+|:--|:--:|:--|:--|
+| `FIB-PC1` | 10 | IP estática `172.16.10.120` | Cambiar a DHCP |
+| `FIB-PC2`, `FIB-PC3` | 10 | — | Verificar que esté en DHCP |
+| `FIB-PC4` | 20 | IP estática `172.16.10.250` | Cambiar a DHCP |
+| `FIB-PC5` | 20 | — | Verificar que esté en DHCP |
+| `MOO-PC1`, `MOO-PC2` | 60 | — | Verificar que esté en DHCP |
+| `MOO-PC3`, `MOO-PC4` | 70 | — | Verificar que esté en DHCP |
+| `MOO-LAPTOP` | 80 | IP estática `172.16.32.150` | Cambiar a DHCP, con la laptop asociada a `MoonLink-WiFi` |
+
+Los cinco PCs de AndinaCom ya reciben su IP por DHCP desde la fase 6. Los servidores `FIB-SRV` y `AND-DHCP` conservan su IP estática, porque ofrecen los servicios.
+
+---
+
+#### Verificación de la fase 10 · Relay y DHCP
+
+En cada switch con relay:
+
+| ISP | Switch | SVI con relay | Departamento | 
+|:--|:--|:--:|:--|
+| FibraNet GT | `FIB-ACC1` | VLAN 10 | Administración | 
+| FibraNet GT | `FIB-ACC2` | VLAN 20 | Atención al Cliente | 
+| AndinaCom | `AND-DIST1` | VLAN 30 y 40 | Ventas y Facturación | 
+| AndinaCom | `AND-DIST2` | VLAN 30 y 40 | Ventas y Facturación |
+| MoonLink | `MOO-SP1` | VLAN 60 | Soporte | 
+| MoonLink | `MOO-SP2` | VLAN 70 | Seguridad | 
+| MoonLink | `MOO-SP3` | VLAN 80 | Soporte Wi-Fi |
+
+Ejecutar:
+
+```
+enable
+show running-config | include helper-address
+```
+
+En cada uno de los equipos de usuario de FibraNet y MoonLink, en **Desktop**, **Command Prompt**:
+```
+ipconfig /all
+```
+
+Resultado esperado en cada equipo:
+
+| Equipos | IP recibida | Máscara | Gateway | DNS | Servidor DHCP |
+|:--|:--|:--|:--|:--|:--|
+| `FIB-PC1`, `FIB-PC2`, `FIB-PC3` | `172.16.10.2` a `.109` | `255.255.255.128` | `172.16.10.1` | `172.16.10.125` | `172.16.20.132` |
+| `FIB-PC4`, `FIB-PC5` | `172.16.10.130` a `.254` | `255.255.255.128` | `172.16.10.129` | `172.16.10.125` | `172.16.20.132` |
+| `MOO-PC1`, `MOO-PC2` | `172.16.32.2` a `.62` | `255.255.255.192` | `172.16.32.1` | `172.16.10.125` | `172.16.20.132` |
+| `MOO-PC3`, `MOO-PC4` | `172.16.32.66` a `.126` | `255.255.255.192` | `172.16.32.65` | `172.16.10.125` | `172.16.20.132` |
+| `MOO-LAPTOP` | `172.16.32.131` a `.190` | `255.255.255.192` | `172.16.32.129` | `172.16.10.125` | `172.16.20.132` |
+
+Si algún equipo queda con una dirección `169.254.x.x` o `0.0.0.0`, se revisa en orden: que el switch de su VLAN tenga el `ip helper-address`, que el servicio DHCP de `AND-DHCP` esté en `On`, que el pool de esa VLAN tenga el gateway correcto, y que la laptop siga asociada al Wi-Fi.
+
+---
+
+#### Verificación de la fase 10 · Comunicación entre ISPs
+
+Con todos los equipos en DHCP, se repiten las pruebas entre ISPs desde un PC de cada uno. Se usan las IPs que muestre `ipconfig /all` en cada equipo.
+
+En `FIB-PC2`, en **Command Prompt**:
+```
+ping <IP de AND-PC2>
+ping <IP de MOO-PC1>
+nslookup www.proyecto2_201504070.com
+```
+
+En `AND-PC2`, en **Command Prompt**:
+```
+ping <IP de FIB-PC2>
+ping <IP de MOO-PC3>
+nslookup www.proyecto2_201504070.com
+```
+
+En `MOO-PC1`, en **Command Prompt**:
+```
+ping <IP de FIB-PC2>
+ping <IP de AND-PC2>
+nslookup www.proyecto2_201504070.com
+```
+
+Después, en **Desktop**, **Web Browser** de `FIB-PC2`, `AND-PC2`, `MOO-PC1` y `MOO-LAPTOP`:
+```
+http://www.proyecto2_201504070.com
+https://www.proyecto2_201504070.com
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show running-config \| include helper-address` | Una línea con `ip helper-address 172.16.20.132` en cada switch |
+| `ipconfig /all` en cada equipo | IP dentro del pool de su VLAN, con el gateway, el DNS y el servidor DHCP de la tabla anterior |
+| Pings entre PCs de distintos ISP | Responden (el primer paquete puede perderse por el ARP) |
+| `nslookup` | Devuelve `172.16.10.125` en los tres ISP |
+| Navegador con `http://` y `https://` | Muestra la página con los datos del estudiante en los cuatro equipos |
+
+Las ACLs todavía no se aplican, por lo que todos los departamentos se comunican entre sí. Las reglas de la tabla 4.2 se implementan en la fase 11.
+
+---
+
+#### Fase 10 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Relay en los switches.** En `FIB-ACC1`, `FIB-ACC2`, `MOO-SP1`, `MOO-SP2` y `MOO-SP3` se ejecutó el comando `show running-config | include helper-address`.
+
+<div align="center">
+  <img src="img/fase10_1.avif" alt="Se adjuntan las cinco pantallas, con la línea `ip helper-address 172.16.20.132` en cada switch" width="100%">
+  <p>Se adjuntan las cinco pantallas, con la línea `ip helper-address 172.16.20.132` en cada switch</p>
+</div>
+
+2. **Equipos devueltos a DHCP.** En `FIB-PC1`, `FIB-PC4` y `MOO-LAPTOP`, en **Desktop**, **IP Configuration**.
+
+<div align="center">
+  <img src="img/fase10_2.avif" alt="Se adjuntan las tres pantallas, con la opción DHCP seleccionada y la dirección recibida" width="100%">
+  <p>Se adjuntan las tres pantallas, con la opción DHCP seleccionada y la dirección recibida</p>
+</div>
+
+3. **DHCP en FibraNet GT.** En `FIB-PC1`, `FIB-PC2`, `FIB-PC3`, `FIB-PC4` y `FIB-PC5` se ejecutó el comando `ipconfig /all`.
+
+<div align="center">
+  <img src="img/fase10_3.avif" alt="Se incluye una captura por cada equipo, donde se aprecian la dirección IP, el gateway, el servidor DHCP y el DNS" width="100%">
+  <p>Se incluye una captura por cada equipo, donde se aprecian la dirección IP, el gateway, el servidor DHCP y el DNS</p>
+</div>
+
+4. **DHCP en MoonLink.** En `MOO-PC1`, `MOO-PC2`, `MOO-PC3`, `MOO-PC4` y `MOO-LAPTOP` se ejecutó el comando `ipconfig /all`.
+
+<div align="center">
+  <img src="img/fase10_4.avif" alt="Se incluye una captura por cada equipo; la laptop recibe su dirección a través del router inalámbrico" width="100%">
+  <p>Se incluye una captura por cada equipo; la laptop recibe su dirección a través del router inalámbrico</p>
+</div>
+
+5. **Resolución del dominio.** En `FIB-PC2`, `AND-PC2` y `MOO-PC1` se ejecutó el comando `nslookup www.proyecto2_201504070.com`.
+
+<div align="center">
+  <img src="img/fase10_5.avif" alt="Se muestra que los tres ISP resuelven el dominio a `172.16.10.125`" width="100%">
+  <p>Se muestra que los tres ISP resuelven el dominio a `172.16.10.125`</p>
+</div>
+
+6. **Acceso web por HTTP y HTTPS.** En el navegador de `FIB-PC2`, `AND-PC2`, `MOO-PC1` y `MOO-LAPTOP` se entro a `https://www.proyecto2_201504070.com`.
+
+<div align="center">
+  <img src="img/fase10_6.avif" alt="Se muestra la página con los datos del estudiante cargada por HTTPS desde cada ISP" width="100%">
+  <p>Se muestra la página con los datos del estudiante cargada por HTTPS desde cada ISP</p>
 </div>
 
 ---
