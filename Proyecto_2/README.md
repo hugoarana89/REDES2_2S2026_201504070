@@ -2126,3 +2126,326 @@ show standby brief
   <img src="img/fase6_10.avif" alt="" width="100%">
   <p>Salida del comando `show standby brief` en `AND-DIST1``</p>
 </div>
+
+---
+
+### Fase 7
+
+#### Fase 7 · Configuración de MoonLink
+
+En esta fase se configuran los cuatro switches multicapa de MoonLink con las VLANs, los dos port-channels LACP del hub hacia `MOO-SP1` y `MOO-SP2`, las SVIs de tránsito y de usuario, el puerto enrutado hacia `MOO-SP3`, los puertos de acceso y EIGRP con el sistema autónomo 10. Se usa el mismo patrón que en las fases anteriores: los puertos físicos del port-channel solo llevan `channel-group`, y el modo troncal con la VLAN permitida se define únicamente en la interfaz `port-channel`.
+
+La topología es hub-and-spoke: `MOO-HUB` es el centro y los tres spokes (`MOO-SP1`, `MOO-SP2` y `MOO-SP3`) solo se comunican entre sí a través del hub. Los enlaces de fibra hacia los otros ISP no participan en EIGRP, porque se manejan con eBGP en la fase 9. Las SVIs de usuario se declaran pasivas. Los PCs todavía no obtienen dirección IP, porque el relay de DHCP hacia AndinaCom se agrega en la fase 10, y el router inalámbrico se configura en la fase 8.
+
+---
+
+#### Fase 7 · MOO-HUB
+
+`MOO-HUB` forma el `Po1` con `MOO-SP1` por `Gi1/0/1-2` y el `Po2` con `MOO-SP2` por `Gi1/0/3-4`. El puerto `Gi1/0/6` es un enlace enrutado hacia `MOO-SP3`.
+
+MOO-HUB:
+```
+enable
+configure terminal
+hostname MOO-HUB
+no ip domain-lookup
+ip routing
+!
+vlan 121
+ name TRANSITO-H-S1
+vlan 122
+ name TRANSITO-H-S2
+exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 1 mode active
+exit
+interface range gigabitEthernet 1/0/3 - 4
+ channel-group 2 mode active
+exit
+!
+interface port-channel 1
+ switchport mode trunk
+ switchport trunk allowed vlan 121
+exit
+interface port-channel 2
+ switchport mode trunk
+ switchport trunk allowed vlan 122
+exit
+!
+interface vlan 121
+ ip address 172.16.32.193 255.255.255.252
+ no shutdown
+exit
+interface vlan 122
+ ip address 172.16.32.197 255.255.255.252
+ no shutdown
+exit
+!
+interface gigabitEthernet 1/0/6
+ no switchport
+ ip address 172.16.32.201 255.255.255.252
+ no shutdown
+exit
+!
+router eigrp 10
+ no auto-summary
+ network 172.16.32.192 0.0.0.3
+ network 172.16.32.196 0.0.0.3
+ network 172.16.32.200 0.0.0.3
+end
+write memory
+```
+
+---
+
+#### Fase 7 · MOO-SP1 y MOO-SP2
+
+`MOO-SP1` forma el `Po1` con el hub y atiende a Soporte (VLAN 60) en `Gi1/0/3-4`. `MOO-SP2` forma el `Po2` con el hub, con sus puertos `Gi1/0/1-2`, y atiende a Seguridad (VLAN 70) en `Gi1/0/3-4`.
+
+MOO-SP1:
+```
+enable
+configure terminal
+hostname MOO-SP1
+no ip domain-lookup
+ip routing
+!
+vlan 60
+ name SOPORTE
+vlan 121
+ name TRANSITO-H-S1
+exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 1 mode active
+exit
+interface port-channel 1
+ switchport mode trunk
+ switchport trunk allowed vlan 121
+exit
+!
+interface vlan 121
+ ip address 172.16.32.194 255.255.255.252
+ no shutdown
+exit
+interface vlan 60
+ ip address 172.16.32.1 255.255.255.192
+ no shutdown
+exit
+!
+interface range gigabitEthernet 1/0/3 - 4
+ switchport mode access
+ switchport access vlan 60
+ spanning-tree portfast
+exit
+!
+router eigrp 10
+ no auto-summary
+ passive-interface vlan 60
+ network 172.16.32.192 0.0.0.3
+ network 172.16.32.0 0.0.0.63
+end
+write memory
+```
+
+MOO-SP2:
+```
+enable
+configure terminal
+hostname MOO-SP2
+no ip domain-lookup
+ip routing
+!
+vlan 70
+ name SEGURIDAD
+vlan 122
+ name TRANSITO-H-S2
+exit
+!
+interface range gigabitEthernet 1/0/1 - 2
+ channel-group 2 mode active
+exit
+interface port-channel 2
+ switchport mode trunk
+ switchport trunk allowed vlan 122
+exit
+!
+interface vlan 122
+ ip address 172.16.32.198 255.255.255.252
+ no shutdown
+exit
+interface vlan 70
+ ip address 172.16.32.65 255.255.255.192
+ no shutdown
+exit
+!
+interface range gigabitEthernet 1/0/3 - 4
+ switchport mode access
+ switchport access vlan 70
+ spanning-tree portfast
+exit
+!
+router eigrp 10
+ no auto-summary
+ passive-interface vlan 70
+ network 172.16.32.196 0.0.0.3
+ network 172.16.32.64 0.0.0.63
+end
+write memory
+```
+
+---
+
+#### Fase 7 · MOO-SP3
+
+`MOO-SP3` se conecta al hub por el puerto enrutado `Gi1/0/2`, y su puerto `Gi1/0/1` es de acceso en la VLAN 80, donde se conectará el router inalámbrico en la fase 8. La SVI de la VLAN 80 es el gateway de la red Wi-Fi.
+
+MOO-SP3:
+```
+enable
+configure terminal
+hostname MOO-SP3
+no ip domain-lookup
+ip routing
+!
+vlan 80
+ name SOPORTE-WIFI
+exit
+!
+interface gigabitEthernet 1/0/2
+ no switchport
+ ip address 172.16.32.202 255.255.255.252
+ no shutdown
+exit
+!
+interface vlan 80
+ ip address 172.16.32.129 255.255.255.192
+ no shutdown
+exit
+!
+interface gigabitEthernet 1/0/1
+ switchport mode access
+ switchport access vlan 80
+ spanning-tree portfast
+exit
+!
+router eigrp 10
+ no auto-summary
+ passive-interface vlan 80
+ network 172.16.32.200 0.0.0.3
+ network 172.16.32.128 0.0.0.63
+end
+write memory
+```
+
+---
+
+#### Verificación de la fase 7 · MoonLink
+
+Se espera cerca de un minuto después de aplicar las cuatro configuraciones, para que los port-channels se formen y EIGRP establezca sus vecinos.
+
+MOO-HUB:
+```
+show etherchannel summary
+show ip interface brief | include Vlan
+show ip eigrp neighbors
+show ip route eigrp
+ping 172.16.32.1
+ping 172.16.32.65
+ping 172.16.32.129
+```
+
+MOO-SP1:
+```
+show etherchannel summary
+show ip interface brief | include Vlan
+show ip eigrp neighbors
+show ip route eigrp
+ping 172.16.32.65
+ping 172.16.32.129
+```
+
+MOO-SP2:
+```
+show etherchannel summary
+show ip eigrp neighbors
+ping 172.16.32.1
+ping 172.16.32.129
+```
+
+MOO-SP3:
+```
+show ip interface brief | include Vlan
+show ip eigrp neighbors
+ping 172.16.32.1
+ping 172.16.32.65
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show etherchannel summary` en `MOO-HUB` | `Po1` y `Po2` en `SU`, con los puertos en `(P)` |
+| `show etherchannel summary` en `MOO-SP1` y `MOO-SP2` | `Po1` en `MOO-SP1` y `Po2` en `MOO-SP2`, en `SU` con los puertos en `(P)` |
+| `show ip interface brief \| include Vlan` | `Vlan121`, `Vlan122` en `MOO-HUB`; `Vlan60`, `Vlan121` en `MOO-SP1`; `Vlan80` en `MOO-SP3`, todas en `up/up` |
+| `show ip eigrp neighbors` en `MOO-HUB` | Tres vecinos: `172.16.32.194` y `172.16.32.198` (interfaz `Vlan`) y `172.16.32.202` (`Gi1/0/6`) |
+| `show ip eigrp neighbors` en cada spoke | Un solo vecino: el hub (`172.16.32.193`, `.197` o `.201`) |
+| `show ip route eigrp` en `MOO-HUB` | Rutas `172.16.32.0/26`, `172.16.32.64/26` y `172.16.32.128/26`, una por cada spoke |
+| `show ip route eigrp` en `MOO-SP1` | Rutas `172.16.32.64/26` y `172.16.32.128/26` (subredes de usuario) y `172.16.32.196/30` y `172.16.32.200/30` (enlaces de tránsito del hub), todas por el hub (`172.16.32.193`) |
+Si `Vlan80` queda en `down`, se revisa que el puerto `Gi1/0/1` de `MOO-SP3` tenga conectado y encendido al router inalámbrico, porque la SVI necesita al menos un puerto activo en su VLAN.
+
+---
+
+#### Fase 7 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Port-channels en el hub.** En `MOO-HUB` se ejecutó el comando `show etherchannel summary`.
+
+<div align="center">
+  <img src="img/fase7_1.avif" alt="Captura pendiente: Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gi1/0/1-4` marcados con `P`" width="100%">
+  <p>Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gi1/0/1-4` marcados con `P`</p>
+</div>
+
+2. **Port-channels en los spokes.** En `MOO-SP1` y en `MOO-SP2` se ejecutó el mismo comando.
+
+<div align="center">
+  <img src="img/fase7_2.avif" alt="Se adjuntan ambas pantallas, con `Po1` en `MOO-SP1` y `Po2` en `MOO-SP2` en `SU`" width="100%">
+  <p>Se adjuntan ambas pantallas, con `Po1` en `MOO-SP1` y `Po2` en `MOO-SP2` en `SU`</p>
+</div>
+
+3. **Estado de las SVIs.** En `MOO-HUB`, `MOO-SP1` y `MOO-SP3` se ejecutó el comando `show ip interface brief | include Vlan`.
+
+<div align="center">
+  <img src="img/fase7_3.avif" alt="Se muestran las SVIs de tránsito y de usuario en `up/up`" width="100%">
+  <p>Se muestran las SVIs de tránsito y de usuario en `up/up`</p>
+</div>
+
+4. **Vecinos EIGRP del hub.** En `MOO-HUB` se ejecutó el comando `show ip eigrp neighbors`.
+
+<div align="center">
+  <img src="img/fase7_4.avif" alt="Se aprecian los tres spokes como vecinos, dos por la interfaz `Vlan` y uno por `Gi1/0/6`" width="100%">
+  <p>Se aprecian los tres spokes como vecinos, dos por la interfaz `Vlan` y uno por `Gi1/0/6`</p>
+</div>
+
+5. **Rutas aprendidas por EIGRP en el hub.** En `MOO-HUB` se ejecutó el comando `show ip route eigrp`.
+
+<div align="center">
+  <img src="img/fase7_5.avif" alt="Se muestran las tres subredes de usuario, cada una por su spoke" width="100%">
+  <p>Se muestran las tres subredes de usuario, cada una por su spoke</p>
+</div>
+
+6. **Rutas aprendidas en un spoke.** En `MOO-SP1` se ejecutó el comando `show ip route eigrp`.
+
+<div align="center">
+  <img src="img/fase7_6.avif" alt="Se observa que las subredes de los otros spokes y sus enlaces de tránsito se aprenden por el hub" width="100%">
+  <p>Se observa que las subredes de los otros spokes y sus enlaces de tránsito se aprenden por el hub</p>
+</div>
+
+7. **Pings entre gateways.** Desde `MOO-HUB` se ejecutaron `ping 172.16.32.1`, `ping 172.16.32.65` y `ping 172.16.32.129`; desde `MOO-SP1`, `ping 172.16.32.65` y `ping 172.16.32.129`.
+
+<div align="center">
+  <img src="img/fase7_7.avif" alt="Se muestran las respuestas de cada ping" width="100%">
+  <p>Se muestran las respuestas de cada ping; el primer paquete puede perderse por el ARP</p>
+</div>
+
+---
