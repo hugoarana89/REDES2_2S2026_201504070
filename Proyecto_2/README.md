@@ -328,7 +328,7 @@ El dispositivo es el **Wireless Router WRT300N** de Packet Tracer (categoría Wi
 | DHCP en el WRT300N | Apagado |
 | IP de gestión | `172.16.32.130/26` (estática) |
 | Seguridad | WPA2-PSK, SSID `MoonLink-WiFi` |
-| Cliente | `MOO-LAPTOP` (Laptop-PT, tarjeta WPC300N incluida), conectada solo por Wi-Fi, sin cable |
+| Cliente | `MOO-LAPTOP` (Laptop-PT, tarjeta WPC300N), conectada solo por Wi-Fi, sin cable |
 
 Como el WRT300N solo tiene interfaz gráfica, es el único dispositivo que no se configura por CLI.
 
@@ -596,14 +596,14 @@ La configuración se hace por fases, una a la vez, y cada fase se verifica antes
 | Fase | Qué se configura | Cómo se verifica | Estado |
 |:--:|:--|:--|:--|
 | 0 | Confirmar que el 3650-24PS ofrece `router bgp`, y nombrar los 14 equipos (hostname) | `router ?` en un 3650 | Hecho |
-| 1 | FibraNet: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, puertos enrutados y puertos de acceso | `show etherchannel summary`, `show ip interface brief` | Pendiente |
+| 1 | FibraNet: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, puertos enrutados y puertos de acceso | `show etherchannel summary`, `show ip interface brief` | Hecho |
 | 2 | FibraNet: SVIs gateway (VLAN 10 y 20) y OSPF área 0 en los 5 switches | `show ip ospf neighbor`, ping entre los gateways | Hecho |
 | 3 | `FIB-SRV`: IP estática, DNS (`www.proyecto2_201504070.com`) y HTTP/HTTPS con la página | Navegador desde un PC con IP estática temporal | Hecho |
 | 4 | AndinaCom: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, troncales y puertos de acceso | `show etherchannel summary`, `show interfaces trunk` | Hecho |
 | 5 | AndinaCom: SVIs de usuario, HSRP, raíz de STP y OSPF área 0 | `show standby brief`, `show ip ospf neighbor` | Hecho |
-| 6 | `AND-DHCP`: IP estática y los 7 pools; `ip helper-address` en las SVIs de AndinaCom | DHCP DORA en los PCs de AndinaCom, y prueba de conmutación HSRP apagando `AND-DIST1` | Pendiente |
+| 6 | `AND-DHCP`: IP estática y los 7 pools; `ip helper-address` en las SVIs de AndinaCom | DHCP DORA en los PCs de AndinaCom, y prueba de conmutación HSRP apagando `AND-DIST1` | Hecho |
 | 7 | MoonLink: VLANs, LACP (`Po1` y `Po2`), SVIs, puerto enrutado a SP3, accesos y EIGRP AS 10 | `show ip eigrp neighbors`, ping entre gateways | Hecho |
-| 8 | MoonLink: WRT300N en modo puente (DHCP apagado, IP de gestión, SSID y WPA2) y asociación de la laptop | La laptop se asocia al SSID | Pendiente |
+| 8 | MoonLink: WRT300N en modo puente (DHCP apagado, IP de gestión, SSID y WPA2) y asociación de la laptop | La laptop se asocia al SSID | Hecho |
 | 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Pendiente |
 | 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | Pendiente |
 | 11 | ACLs extendidas por departamento (orden de reglas y tabla 4.2) | Matriz de ping y acceso web entre todos los pares de departamentos | Pendiente |
@@ -2579,7 +2579,7 @@ Resultado esperado:
 6. **Pings desde la laptop.** En **Command Prompt** se ejecutaron `ping 172.16.32.130`, `ping 172.16.32.129`, `ping 172.16.32.1` y `ping 172.16.32.65`.
 
 <div align="center">
-  <img src="img/fase8_6.avif" alt="Captura pendiente: Se muestran las respuestas de los cuatro pings" width="100%">
+  <img src="img/fase8_6.avif" alt="Se muestran las respuestas de los cuatro pings" width="100%">
   <p>Se muestran las respuestas de los cuatro pings; el primer paquete puede perderse por el ARP</p>
 </div>
 
@@ -2588,6 +2588,272 @@ Resultado esperado:
 <div align="center">
   <img src="img/fase8_7.avif" alt="Captura pendiente: Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`" width="100%">
   <p>Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`</p>
+</div>
+
+---
+
+### Fase 9
+
+#### Fase 9 · Configuración de eBGP entre los switches de borde
+
+En esta fase se configuran las interfaces de fibra de los tres switches de borde y la sesión eBGP entre los tres ISP, con un sistema autónomo por proveedor: `65001` (FibraNet GT), `65002` (AndinaCom) y `65003` (MoonLink). Packet Tracer solo soporta eBGP, y no acepta `update-source` ni `ebgp-multihop`, por lo que cada vecino se declara con la IP directa del enlace /30.
+
+Cada borde anuncia las subredes de usuario de su ISP con una sentencia `network` por subred, con la máscara exacta con la que aparecen en su tabla de rutas. Así no hace falta una ruta estática de resumen. Después, cada borde inyecta las rutas aprendidas por BGP en el protocolo interno de su ISP, para que los demás equipos tengan ruta de regreso: `redistribute bgp` en OSPF para FibraNet y AndinaCom, y en EIGRP para MoonLink. Los enlaces de fibra no participan en OSPF ni en EIGRP.
+
+Las interfaces de fibra son puertos enrutados (`no switchport`), con las direcciones del bloque `192.168.70.0/28`:
+
+| Equipo | Interfaz | Dirección | Vecino |
+|:--|:--|:--|:--|
+| `FIB-CORE` | `Gi1/1/1` | `192.168.70.1/30` | `AND-CORE` (`192.168.70.2`) |
+| `FIB-CORE` | `Gi1/1/2` | `192.168.70.9/30` | `MOO-HUB` (`192.168.70.10`) |
+| `AND-CORE` | `Gi1/1/1` | `192.168.70.2/30` | `FIB-CORE` (`192.168.70.1`) |
+| `AND-CORE` | `Gi1/1/2` | `192.168.70.5/30` | `MOO-HUB` (`192.168.70.6`) |
+| `MOO-HUB` | `Gi1/1/1` | `192.168.70.6/30` | `AND-CORE` (`192.168.70.5`) |
+| `MOO-HUB` | `Gi1/1/2` | `192.168.70.10/30` | `FIB-CORE` (`192.168.70.9`) |
+
+---
+
+#### Fase 9 · FIB-CORE
+
+FIB-CORE:
+```
+enable
+configure terminal
+interface gigabitEthernet 1/1/1
+ no switchport
+ ip address 192.168.70.1 255.255.255.252
+ no shutdown
+exit
+interface gigabitEthernet 1/1/2
+ no switchport
+ ip address 192.168.70.9 255.255.255.252
+ no shutdown
+exit
+!
+router bgp 65001
+ bgp router-id 1.1.1.1
+ bgp log-neighbor-changes
+ neighbor 192.168.70.2 remote-as 65002
+ neighbor 192.168.70.10 remote-as 65003
+ network 172.16.10.0 mask 255.255.255.128
+ network 172.16.10.128 mask 255.255.255.128
+exit
+!
+router ospf 1
+ redistribute bgp 65001 subnets
+end
+write memory
+```
+
+---
+
+#### Fase 9 · AND-CORE
+
+AND-CORE:
+```
+enable
+configure terminal
+interface gigabitEthernet 1/1/1
+ no switchport
+ ip address 192.168.70.2 255.255.255.252
+ no shutdown
+exit
+interface gigabitEthernet 1/1/2
+ no switchport
+ ip address 192.168.70.5 255.255.255.252
+ no shutdown
+exit
+!
+router bgp 65002
+ bgp router-id 2.2.2.2
+ bgp log-neighbor-changes
+ neighbor 192.168.70.1 remote-as 65001
+ neighbor 192.168.70.6 remote-as 65003
+ network 172.16.20.0 mask 255.255.255.192
+ network 172.16.20.64 mask 255.255.255.192
+ network 172.16.20.128 mask 255.255.255.224
+exit
+!
+router ospf 1
+ redistribute bgp 65002 subnets
+end
+write memory
+```
+
+---
+
+#### Fase 9 · MOO-HUB
+
+En EIGRP, las rutas redistribuidas necesitan una métrica inicial. Los valores corresponden a ancho de banda en kbps (`10000`), retardo (`100`), confiabilidad (`255`), carga (`1`) y MTU (`1500`).
+
+MOO-HUB:
+```
+enable
+configure terminal
+interface gigabitEthernet 1/1/1
+ no switchport
+ ip address 192.168.70.6 255.255.255.252
+ no shutdown
+exit
+interface gigabitEthernet 1/1/2
+ no switchport
+ ip address 192.168.70.10 255.255.255.252
+ no shutdown
+exit
+!
+router bgp 65003
+ bgp router-id 3.3.3.3
+ bgp log-neighbor-changes
+ neighbor 192.168.70.5 remote-as 65002
+ neighbor 192.168.70.9 remote-as 65001
+ network 172.16.32.0 mask 255.255.255.192
+ network 172.16.32.64 mask 255.255.255.192
+ network 172.16.32.128 mask 255.255.255.192
+exit
+!
+router eigrp 10
+ redistribute bgp 65003 metric 10000 100 255 1 1500
+end
+write memory
+```
+
+---
+
+#### Verificación de la fase 9 · eBGP
+
+Se espera cerca de dos minutos después de aplicar las tres configuraciones, para que las sesiones BGP lleguen a `Established` y las rutas se redistribuyan en cada ISP.
+
+FIB-CORE:
+```
+show ip bgp summary
+show ip bgp
+show ip route bgp
+ping 192.168.70.2
+ping 192.168.70.10
+```
+
+AND-CORE:
+```
+show ip bgp summary
+show ip route bgp
+ping 192.168.70.1
+ping 192.168.70.6
+```
+
+MOO-HUB:
+```
+show ip bgp summary
+show ip route bgp
+ping 192.168.70.5
+ping 192.168.70.9
+```
+
+Rutas externas dentro de cada ISP:
+
+FIB-ACC1:
+```
+show ip route ospf
+```
+
+AND-DIST1:
+```
+show ip route ospf
+```
+
+MOO-SP1:
+```
+show ip route eigrp
+```
+
+Comunicación entre equipos de usuario de distintos ISP. En `FIB-PC1`, en **Desktop**, **Command Prompt**, con la IP que muestre `ipconfig` en `AND-PC1` y la de `MOO-LAPTOP`:
+
+```
+ping 172.16.10.120
+```
+
+En `AND-PC1`:
+```
+ping 172.16.10.125
+nslookup www.proyecto2_201504070.com
+ping 172.16.32.150
+```
+
+En `MOO-LAPTOP`, en **Web Browser**:
+```
+http://www.proyecto2_201504070.com
+https://www.proyecto2_201504070.com
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `show ip bgp summary` en cada core | Dos vecinos con el contador de prefijos recibidos como número (no `Active` ni `Idle`), lo que confirma la sesión `Established` |
+| `show ip bgp` en `FIB-CORE` | Ocho prefijos en total: dos de FibraNet, tres de AndinaCom y tres de MoonLink |
+| `show ip route bgp` en `FIB-CORE` | Seis rutas `B`: las de AndinaCom por `192.168.70.2` y las de MoonLink por `192.168.70.10` |
+| `show ip route bgp` en `AND-CORE` | Cinco rutas `B`: las de FibraNet por `192.168.70.1` y las de MoonLink por `192.168.70.6` |
+| `show ip route bgp` en `MOO-HUB` | Cinco rutas `B`: las de AndinaCom por `192.168.70.5` y las de FibraNet por `192.168.70.9` |
+| `show ip route ospf` en `FIB-ACC1` | Seis rutas `O E2` hacia las subredes de AndinaCom y MoonLink |
+| `show ip route ospf` en `AND-DIST1` | Cinco rutas `O E2` hacia las subredes de FibraNet y MoonLink |
+| `show ip route eigrp` en `MOO-SP1` | Cinco rutas `D EX` hacia las subredes de FibraNet y AndinaCom |
+| Pings entre los cores por las IPs de fibra | Responden (el primer paquete puede perderse por el ARP) |
+| Pings entre equipos de usuario de distintos ISP | Responden, y es la demostración que el enunciado pide con un solo intento |
+| `nslookup` desde `AND-PC1` | Devuelve `172.16.10.125` para `www.proyecto2_201504070.com` |
+| Navegador en `MOO-LAPTOP` | La página con los datos del estudiante carga por HTTP y por HTTPS |
+
+Los pings se hacen desde equipos de usuario y no desde los cores, porque las direcciones de fibra no se anuncian por BGP. Un ping desde un core hacia otro ISP lleva como origen la IP de su enlace de fibra, y las distribuciones del ISP destino no tienen ruta de regreso hacia ella.
+
+---
+
+#### Fase 9 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Interfaces de fibra.** En `FIB-CORE`, `AND-CORE` y `MOO-HUB` se ejecutó el comando `show ip interface brief | include 1/1`.
+
+<div align="center">
+  <img src="img/fase9_1.avif" alt="Se adjuntan las tres pantallas, con las interfaces `Gi1/1/1` y `Gi1/1/2` en `up/up` y sus direcciones del bloque `192.168.70.0`" width="100%">
+  <p>Se adjuntan las tres pantallas, con las interfaces `Gi1/1/1` y `Gi1/1/2` en `up/up` y sus direcciones del bloque `192.168.70.0`</p>
+</div>
+
+2. **Sesiones BGP.** En los tres switches de borde se ejecutó el comando `show ip bgp summary`.
+
+<div align="center">
+  <img src="img/fase9_2.avif" alt="Se aprecian los dos vecinos de cada equipo establecidos, con su número de sistema autónomo y los prefijos recibidos" width="100%">
+  <p>Se aprecian los dos vecinos de cada equipo establecidos, con su número de sistema autónomo y los prefijos recibidos</p>
+</div>
+
+3. **Tabla BGP.** En `FIB-CORE` se ejecutó el comando `show ip bgp`.
+
+<div align="center">
+  <img src="img/fase9_3.avif" alt="Se muestran los ocho prefijos de los tres ISP, con el siguiente salto y la ruta de sistemas autónomos de cada uno" width="100%">
+  <p>Se muestran los ocho prefijos de los tres ISP, con el siguiente salto y la ruta de sistemas autónomos de cada uno</p>
+</div>
+
+4. **Rutas aprendidas por BGP.** En los tres switches de borde se ejecutó el comando `show ip route bgp`.
+
+<div align="center">
+  <img src="img/fase9_4.avif" alt="Se observan las rutas `B` hacia las subredes de los otros dos ISP, cada una por el vecino directo" width="100%">
+  <p>Se observan las rutas `B` hacia las subredes de los otros dos ISP, cada una por el vecino directo</p>
+</div>
+
+5. **Rutas externas dentro de cada ISP.** En `FIB-ACC1` y `AND-DIST1` se ejecutó `show ip route ospf`, y en `MOO-SP1`, `show ip route eigrp`.
+
+<div align="center">
+  <img src="img/fase9_5.avif" alt="Se aprecian las rutas `O E2` en FibraNet y AndinaCom, y las rutas `D EX` en MoonLink" width="100%">
+  <p>Se aprecian las rutas `O E2` en FibraNet y AndinaCom, y las rutas `D EX` en MoonLink</p>
+</div>
+
+6. **Comunicación entre equipos de usuario de distintos ISP.** Desde `FIB-PC1` se ejecutaron `ping 172.16.20.5` y `ping 172.16.32.150`, y desde `AND-PC1`, `ping 172.16.32.150`.
+
+<div align="center">
+  <img src="img/fase9_6.avif" alt="Se muestran las respuestas de los pings entre FibraNet, AndinaCom y MoonLink" width="100%">
+  <p>Se muestran las respuestas de los pings entre FibraNet, AndinaCom y MoonLink</p>
+</div>
+
+7. **DNS y web entre ISPs.** En `AND-PC1` se ejecutó `nslookup www.proyecto2_201504070.com` y `ping 172.16.10.125`. En `MOO-LAPTOP` se abrió el dominio en el navegador por HTTP y por HTTPS.
+
+<div align="center">
+  <img src="img/fase9_7.avif" alt="Se muestran la resolución del dominio desde AndinaCom y la página cargada desde MoonLink" width="100%">
+  <p>Se muestran la resolución del dominio desde AndinaCom y la página cargada desde MoonLink</p>
 </div>
 
 ---
