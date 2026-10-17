@@ -595,14 +595,14 @@ La configuración se hace por fases, una a la vez, y cada fase se verifica antes
 
 | Fase | Qué se configura | Cómo se verifica | Estado |
 |:--:|:--|:--|:--|
-| 0 | Confirmar que el 3650-24PS ofrece `router bgp`, y nombrar los 14 equipos (hostname) | `router ?` en un 3650 | Pendiente |
+| 0 | Confirmar que el 3650-24PS ofrece `router bgp`, y nombrar los 14 equipos (hostname) | `router ?` en un 3650 | Hecho |
 | 1 | FibraNet: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, puertos enrutados y puertos de acceso | `show etherchannel summary`, `show ip interface brief` | Pendiente |
-| 2 | FibraNet: SVIs gateway (VLAN 10 y 20) y OSPF área 0 en los 5 switches | `show ip ospf neighbor`, ping entre los gateways | Pendiente |
-| 3 | `FIB-SRV`: IP estática, DNS (`www.proyecto2_201504070.com`) y HTTP/HTTPS con la página | Navegador desde un PC con IP estática temporal | Pendiente |
-| 4 | AndinaCom: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, troncales y puertos de acceso | `show etherchannel summary`, `show interfaces trunk` | Pendiente |
-| 5 | AndinaCom: SVIs de usuario, HSRP, raíz de STP y OSPF área 0 | `show standby brief`, `show ip ospf neighbor` | Pendiente |
+| 2 | FibraNet: SVIs gateway (VLAN 10 y 20) y OSPF área 0 en los 5 switches | `show ip ospf neighbor`, ping entre los gateways | Hecho |
+| 3 | `FIB-SRV`: IP estática, DNS (`www.proyecto2_201504070.com`) y HTTP/HTTPS con la página | Navegador desde un PC con IP estática temporal | Hecho |
+| 4 | AndinaCom: VLANs, LACP (`Po1` y `Po2`), SVIs de tránsito, troncales y puertos de acceso | `show etherchannel summary`, `show interfaces trunk` | Hecho |
+| 5 | AndinaCom: SVIs de usuario, HSRP, raíz de STP y OSPF área 0 | `show standby brief`, `show ip ospf neighbor` | Hecho |
 | 6 | `AND-DHCP`: IP estática y los 7 pools; `ip helper-address` en las SVIs de AndinaCom | DHCP DORA en los PCs de AndinaCom, y prueba de conmutación HSRP apagando `AND-DIST1` | Pendiente |
-| 7 | MoonLink: VLANs, LACP (`Po1` y `Po2`), SVIs, puerto enrutado a SP3, accesos y EIGRP AS 10 | `show ip eigrp neighbors`, ping entre gateways | Pendiente |
+| 7 | MoonLink: VLANs, LACP (`Po1` y `Po2`), SVIs, puerto enrutado a SP3, accesos y EIGRP AS 10 | `show ip eigrp neighbors`, ping entre gateways | Hecho |
 | 8 | MoonLink: WRT300N en modo puente (DHCP apagado, IP de gestión, SSID y WPA2) y asociación de la laptop | La laptop se asocia al SSID | Pendiente |
 | 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Pendiente |
 | 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | Pendiente |
@@ -2446,6 +2446,148 @@ Si `Vlan80` queda en `down`, se revisa que el puerto `Gi1/0/1` de `MOO-SP3` teng
 <div align="center">
   <img src="img/fase7_7.avif" alt="Se muestran las respuestas de cada ping" width="100%">
   <p>Se muestran las respuestas de cada ping; el primer paquete puede perderse por el ARP</p>
+</div>
+
+---
+
+### Fase 8
+
+#### Fase 8 · Configuración del router inalámbrico MOO-WIFI
+
+El `MOO-WIFI` es un Wireless Router WRT300N de Packet Tracer y trabaja como puente inalámbrico: este modelo no soporta relay DHCP, por lo que se conecta por su puerto LAN a `MOO-SP3` y no entrega direcciones. Los clientes Wi-Fi quedan en la VLAN 80 y reciben su IP del servidor `AND-DHCP` a través del relay de `MOO-SP3`, que se configura en la fase 10. El equipo solo tiene interfaz gráfica, por lo que es el único dispositivo del proyecto que no se configura por CLI.
+
+Se hace clic sobre el router, se abre la pestaña **GUI** y se entra a **Setup**, **Basic Setup**. En la sección **Network Setup** se completan los datos de gestión y se desactiva el servidor DHCP del router:
+
+| Parámetro | Valor |
+|:--|:--|
+| Router IP, IP Address | `172.16.32.130` |
+| Router IP, Subnet Mask | `255.255.255.192` |
+| DHCP Server | Disabled |
+
+La sección **Internet Setup** se deja con su valor por defecto, porque el puerto Internet queda libre. Se pulsa **Save Settings** al final de la página.
+
+---
+
+#### Fase 8 · Configuración de la red inalámbrica
+
+En **Wireless**, **Basic Wireless Settings**, se define el nombre de la red:
+
+| Parámetro | Valor |
+|:--|:--|
+| Network Mode | Mixed |
+| Network Name (SSID) | `MoonLink-WiFi` |
+| SSID Broadcast | Enabled |
+
+Se pulsa **Save Settings**. Después, en **Wireless**, **Wireless Security**, se activa el cifrado WPA2:
+
+| Parámetro | Valor |
+|:--|:--|
+| Security Mode | WPA2 Personal |
+| Encryption | AES |
+| Passphrase | `MoonLink2026` |
+
+Se pulsa **Save Settings**. La clave se usa solo en esta práctica de laboratorio.
+
+---
+
+#### Fase 8 · Asociación de la laptop
+
+Primero se tiene que entrar a la laptop `MOO-LAPTOP` entrar a la pestaña Physical y apagar la laptop, luego retirar el módulo que trae por defecto y colocar el módulo `WPC300` y encender nuevamente. 
+
+La `MOO-LAPTOP` se conecta únicamente por Wi-Fi, sin cable. Se hace clic sobre la laptop y se abre **Desktop**, **PC Wireless**. En la pestaña **Connect** se pulsa **Refresh**, se selecciona la red `MoonLink-WiFi` y se pulsa **Connect**. Al pedir la clave se escribe la frase de paso de WPA2: `MoonLink2026` y se confirma. La laptop debe quedar dentro del alcance del router en el lienzo de Packet Tracer.
+
+Como DHCP todavía no llega a MoonLink (el relay se agrega en la fase 10), se usa una IP estática temporal solo para probar la conectividad. En **Desktop**, **IP Configuration**, se selecciona **Static**:
+
+| Parámetro | Valor |
+|:--|:--|
+| IPv4 Address | `172.16.32.150` |
+| Subnet Mask | `255.255.255.192` |
+| Default Gateway | `172.16.32.129` |
+| DNS Server | `172.16.10.125` |
+
+Esta dirección es solo para la prueba. La laptop debe volver a **DHCP** al terminar la fase 10, porque el proyecto no se califica con direccionamiento estático.
+
+---
+
+#### Verificación de la fase 8 · MoonLink
+
+En `MOO-LAPTOP`, en **Desktop**, **Command Prompt**:
+```
+ping 172.16.32.130
+ping 172.16.32.129
+ping 172.16.32.1
+ping 172.16.32.65
+```
+
+En `MOO-SP3`:
+```
+ping 172.16.32.130
+ping 172.16.32.150
+show ip arp
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| Pestaña **Connect** de **PC Wireless** | La laptop aparece asociada a `MoonLink-WiFi` |
+| `ping 172.16.32.130` desde la laptop | Responde, lo que confirma la asociación y la IP de gestión del router |
+| `ping 172.16.32.129` desde la laptop | Responde (gateway de la VLAN 80 en `MOO-SP3`) |
+| `ping 172.16.32.1` y `ping 172.16.32.65` desde la laptop | Responden, lo que confirma el enrutamiento por EIGRP a través del hub |
+| `ping 172.16.32.130` y `.150` desde `MOO-SP3` | Responden (el primer paquete puede perderse por el ARP) |
+| `show ip arp` en `MOO-SP3` | Muestra entradas para `172.16.32.130` y `172.16.32.150` en la interfaz `Vlan80` |
+
+---
+
+#### Fase 8 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **Configuración básica del router.** En la pestaña **GUI** de `MOO-WIFI`, en **Setup**, **Basic Setup**.
+
+<div align="center">
+  <img src="img/fase8_1.avif" alt="Se aprecian la IP `172.16.32.130`, la máscara `255.255.255.192` y el servidor DHCP desactivado" width="100%">
+  <p>Se aprecian la IP `172.16.32.130`, la máscara `255.255.255.192` y el servidor DHCP desactivado</p>
+</div>
+
+2. **Nombre de la red inalámbrica.** En **Wireless**, **Basic Wireless Settings**.
+
+<div align="center">
+  <img src="img/fase8_2.avif" alt=" Se muestra el SSID `MoonLink-WiFi` configurado" width="100%">
+  <p>Se muestra el SSID `MoonLink-WiFi` configurado</p>
+</div>
+
+3. **Seguridad inalámbrica.** En **Wireless**, **Wireless Security**.
+
+<div align="center">
+  <img src="img/fase8_3.avif" alt="Se observa el modo WPA2 Personal con cifrado AES" width="100%">
+  <p>Se observa el modo WPA2 Personal con cifrado AES</p>
+</div>
+
+4. **Asociación de la laptop.** En `MOO-LAPTOP`, en **Desktop**, **PC Wireless**, pestaña **Connect**.
+
+<div align="center">
+  <img src="img/fase8_4.avif" alt="Captura pendiente: Se muestra la laptop conectada a la red `MoonLink-WiFi`" width="100%">
+  <p>Se muestra la laptop conectada a la red `MoonLink-WiFi`</p>
+</div>
+
+5. **IP estática temporal.** En `MOO-LAPTOP`, en **Desktop**, **IP Configuration**.
+
+<div align="center">
+  <img src="img/fase8_5.avif" alt="Se aprecian la dirección `172.16.32.150`, el gateway y el servidor DNS" width="100%">
+  <p>Se aprecian la dirección `172.16.32.150`, el gateway y el servidor DNS</p>
+</div>
+
+6. **Pings desde la laptop.** En **Command Prompt** se ejecutaron `ping 172.16.32.130`, `ping 172.16.32.129`, `ping 172.16.32.1` y `ping 172.16.32.65`.
+
+<div align="center">
+  <img src="img/fase8_6.avif" alt="Captura pendiente: Se muestran las respuestas de los cuatro pings" width="100%">
+  <p>Se muestran las respuestas de los cuatro pings; el primer paquete puede perderse por el ARP</p>
+</div>
+
+7. **Comprobación desde `MOO-SP3`.** En `MOO-SP3` se ejecutaron `ping 172.16.32.130`, `ping 172.16.32.150` y `show ip arp`.
+
+<div align="center">
+  <img src="img/fase8_7.avif" alt="Captura pendiente: Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`" width="100%">
+  <p>Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`</p>
 </div>
 
 ---
