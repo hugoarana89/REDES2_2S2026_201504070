@@ -373,7 +373,9 @@ Las ACLs se aplican **inbound en la SVI de cada departamento**, lo más cerca po
 
 ---
 
-## Topología física
+## Diagramas
+
+### Diagrama inicial de topología
 
 ```mermaid
 flowchart TB
@@ -459,6 +461,10 @@ flowchart TB
     ACORE ===|"Fibra · eBGP"| MHUB
     FCORE ===|"Fibra · eBGP"| MHUB
 ```
+
+### Topología en cisco packet tracer
+
+<img src="img/topología.avif" alt="" width="100%">
 
 ### Identificación de componentes
 
