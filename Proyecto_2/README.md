@@ -491,6 +491,33 @@ flowchart TB
 
 ---
 
+## Dispositivos finales por VLAN
+
+`FIB-PC5` pertenece a la **VLAN 20** (Atención al Cliente). Esta es la tabla completa:
+
+| Dispositivo | Switch y puerto | VLAN | Departamento | Subred | Gateway |
+|:--|:--|:--:|:--|:--|:--|
+| `FIB-PC1` | `FIB-ACC1` `Gi1/0/2` | 10 | Administración | `172.16.10.0/25` | `172.16.10.1` |
+| `FIB-PC2` | `FIB-ACC1` `Gi1/0/3` | 10 | Administración | `172.16.10.0/25` | `172.16.10.1` |
+| `FIB-PC3` | `FIB-ACC1` `Gi1/0/4` | 10 | Administración | `172.16.10.0/25` | `172.16.10.1` |
+| `FIB-SRV` | `FIB-ACC1` `Gi1/0/5` | 10 | Administración (servidor) | `172.16.10.0/25` | `172.16.10.1` |
+| `FIB-PC4` | `FIB-ACC2` `Gi1/0/2` | 20 | Atención al Cliente | `172.16.10.128/25` | `172.16.10.129` |
+| `FIB-PC5` | `FIB-ACC2` `Gi1/0/3` | 20 | Atención al Cliente | `172.16.10.128/25` | `172.16.10.129` |
+| `AND-PC1` | `AND-ACC1` `Gi1/0/2` | 30 | Ventas | `172.16.20.0/26` | `172.16.20.1` (HSRP) |
+| `AND-PC2` | `AND-ACC1` `Gi1/0/3` | 30 | Ventas | `172.16.20.0/26` | `172.16.20.1` (HSRP) |
+| `AND-PC3` | `AND-ACC1` `Gi1/0/4` | 30 | Ventas | `172.16.20.0/26` | `172.16.20.1` (HSRP) |
+| `AND-PC4` | `AND-ACC2` `Gi1/0/2` | 40 | Facturación | `172.16.20.64/26` | `172.16.20.65` (HSRP) |
+| `AND-PC5` | `AND-ACC2` `Gi1/0/3` | 40 | Facturación | `172.16.20.64/26` | `172.16.20.65` (HSRP) |
+| `AND-DHCP` | `AND-ACC2` `Gi1/0/4` | 50 | Servidores (servidor) | `172.16.20.128/27` | `172.16.20.129` (HSRP) |
+| `MOO-PC1` | `MOO-SP1` `Gi1/0/3` | 60 | Soporte | `172.16.32.0/26` | `172.16.32.1` |
+| `MOO-PC2` | `MOO-SP1` `Gi1/0/4` | 60 | Soporte | `172.16.32.0/26` | `172.16.32.1` |
+| `MOO-PC3` | `MOO-SP2` `Gi1/0/3` | 70 | Seguridad | `172.16.32.64/26` | `172.16.32.65` |
+| `MOO-PC4` | `MOO-SP2` `Gi1/0/4` | 70 | Seguridad | `172.16.32.64/26` | `172.16.32.65` |
+| `MOO-WIFI` | `MOO-SP3` `Gi1/0/1` | 80 | Soporte Wi-Fi (router inalámbrico) | `172.16.32.128/26` | `172.16.32.129` |
+| `MOO-LAPTOP` | Por Wi-Fi, a través de `MOO-WIFI` | 80 | Soporte Wi-Fi | `172.16.32.128/26` | `172.16.32.129` |
+
+---
+
 ## Conexiones por puerto
 
 Estas tablas son el cableado real armado en Packet Tracer. Los cables entre switches son cruzados (Copper Cross Over) y los de hosts y servidores son directos (Copper Straight-Through).
@@ -606,8 +633,7 @@ La configuración se hace por fases, una a la vez, y cada fase se verifica antes
 | 8 | MoonLink: WRT300N en modo puente (DHCP apagado, IP de gestión, SSID y WPA2) y asociación de la laptop | La laptop se asocia al SSID | Hecho |
 | 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Hecho |
 | 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | hecho |
-| 11 | ACLs extendidas por departamento (orden de reglas y tabla 4.2) | Matriz de ping y acceso web entre todos los pares de departamentos | Pendiente |
-| 12 | Guardado final (`write memory`), archivo `.pkt`, capturas y pruebas para el manual | Reinicio de dispositivos y revisión de que todo persiste | Pendiente |
+| 11 | ACLs extendidas por departamento (orden de reglas y tabla 4.2) | Matriz de ping y acceso web entre todos los pares de departamentos | Hecho |
 | 13 | Captura en Wireshark desde una VM (TCP handshake, DNS, HTTP/HTTPS, ICMP) | Archivo `.pcapng` abre en Wireshark | Pendiente |
 | 14 | Práctica del modo simulación (DHCP DORA, DNS, HTTP/HTTPS, OSPF/EIGRP y BGP) | Explicar capa por capa un paquete elegido al azar | Pendiente |
 | 15 | Manual técnico, presentación ejecutiva y commits en el repositorio | Entregables completos antes del 23/10/2026 | Pendiente |
@@ -3080,5 +3106,459 @@ Las ACLs todavía no se aplican, por lo que todos los departamentos se comunican
   <img src="img/fase10_6.avif" alt="Se muestra la página con los datos del estudiante cargada por HTTPS desde cada ISP" width="100%">
   <p>Se muestra la página con los datos del estudiante cargada por HTTPS desde cada ISP</p>
 </div>
+
+---
+
+Antes de empezar, una aclaración de memoria: la fase 10 ya figuraba como completada, así que sigo directamente con la fase 11.
+
+---
+
+### Fase 11
+
+#### Fase 11 · Configuración de las ACLs extendidas
+
+En esta fase se implementan las reglas de comunicación de la tabla 4.2 con ACLs extendidas con nombre. Cada ACL se aplica en dirección **entrante (`in`) sobre la SVI de su departamento**, en el switch que es gateway de esa VLAN. Se elige ese punto porque es el más cercano al origen del tráfico: los paquetes no permitidos se descartan antes de cruzar la red, y cada ACL se escribe desde la perspectiva de su departamento de origen. Como las ACLs no guardan estado, las respuestas se permiten de forma explícita.
+
+Cada ACL sigue este orden:
+
+1. **DHCP del cliente** (`udp 68` hacia `udp 67`), para que los equipos obtengan y renueven su IP.
+2. **DNS** (`udp 53` hacia `FIB-SRV`). En `ACL-ADMIN` se permite además la respuesta del servidor, porque vive en esa VLAN.
+3. **HSRP** (`udp 1985` hacia `224.0.0.2`), solo en las dos ACLs de AndinaCom. El switch que no es activo recibe los mensajes del otro por la misma SVI, y sin esta regla las dos distribuciones se declararían activas.
+4. **Respuestas**: `tcp established` y `icmp echo-reply`.
+5. **Gateway propio**: ping desde el departamento hacia su propia subred, solo en las ACLs que no tienen un permiso general de ICMP.
+6. **Denegaciones** hacia Seguridad (todos los departamentos menos Seguridad) y las específicas de la tabla (Atención con Facturación).
+7. **Permisos por destino** de la tabla 4.2.
+
+Las subredes de destino se escriben con estas máscaras inversas. En Soporte y Soporte Wi-Fi se usa una sola entrada, porque `0.0.0.191` deja libre el bit de 128 y cubre `172.16.32.0/26` y `172.16.32.128/26`:
+
+| Departamento | Subred | Máscara inversa |
+|:--|:--|:--|
+| Administración | `172.16.10.0` | `0.0.0.127` |
+| Atención al Cliente | `172.16.10.128` | `0.0.0.127` |
+| Ventas | `172.16.20.0` | `0.0.0.63` |
+| Facturación | `172.16.20.64` | `0.0.0.63` |
+| Soporte y Soporte Wi-Fi | `172.16.32.0` | `0.0.0.191` |
+| Seguridad | `172.16.32.64` | `0.0.0.63` |
+
+| Departamento | ACL | Dispositivo(s) | Interfaz | Sentido |
+|:--|:--|:--|:--|:--:|
+| Administración | `ACL-ADMIN` | `FIB-ACC1` | SVI VLAN 10 | in |
+| Atención al Cliente | `ACL-ATENCION` | `FIB-ACC2` | SVI VLAN 20 | in |
+| Ventas | `ACL-VENTAS` | `AND-DIST1` y `AND-DIST2` | SVI VLAN 30 | in |
+| Facturación | `ACL-FACTURACION` | `AND-DIST1` y `AND-DIST2` | SVI VLAN 40 | in |
+| Soporte | `ACL-SOPORTE` | `MOO-SP1` | SVI VLAN 60 | in |
+| Seguridad | `ACL-SEGURIDAD` | `MOO-SP2` | SVI VLAN 70 | in |
+| Soporte Wi-Fi | `ACL-SOPORTE` | `MOO-SP3` | SVI VLAN 80 | in |
+
+---
+
+#### Fase 11 · FibraNet GT
+
+FIB-ACC1:
+```
+enable
+configure terminal
+ip access-list extended ACL-ADMIN
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit udp host 172.16.10.125 eq 53 any
+ permit tcp any any established
+ permit icmp any any echo-reply
+ deny ip any 172.16.32.64 0.0.0.63
+ permit icmp 172.16.10.0 0.0.0.127 any
+ permit tcp 172.16.10.0 0.0.0.127 any eq 80
+ permit tcp 172.16.10.0 0.0.0.127 any eq 443
+exit
+interface vlan 10
+ ip access-group ACL-ADMIN in
+end
+write memory
+```
+
+FIB-ACC2:
+```
+enable
+configure terminal
+ip access-list extended ACL-ATENCION
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit tcp any any established
+ permit icmp any any echo-reply
+ permit icmp 172.16.10.128 0.0.0.127 172.16.10.128 0.0.0.127
+ deny ip any 172.16.32.64 0.0.0.63
+ deny ip any 172.16.20.64 0.0.0.63
+ permit icmp 172.16.10.128 0.0.0.127 172.16.10.0 0.0.0.127
+ permit tcp 172.16.10.128 0.0.0.127 172.16.10.0 0.0.0.127 eq 80
+ permit tcp 172.16.10.128 0.0.0.127 172.16.10.0 0.0.0.127 eq 443
+ permit icmp 172.16.10.128 0.0.0.127 172.16.32.0 0.0.0.191
+ permit tcp 172.16.10.128 0.0.0.127 172.16.32.0 0.0.0.191 eq 80
+ permit tcp 172.16.10.128 0.0.0.127 172.16.32.0 0.0.0.191 eq 443
+ permit icmp 172.16.10.128 0.0.0.127 172.16.20.0 0.0.0.63
+ permit tcp 172.16.10.128 0.0.0.127 172.16.20.0 0.0.0.63 eq 80
+exit
+interface vlan 20
+ ip access-group ACL-ATENCION in
+end
+write memory
+```
+
+---
+
+#### Fase 11 · AndinaCom
+
+Las dos distribuciones llevan las mismas ACLs, porque cualquiera de las dos puede ser el HSRP activo de cada VLAN.
+
+AND-DIST1:
+```
+enable
+configure terminal
+ip access-list extended ACL-VENTAS
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit udp any host 224.0.0.2 eq 1985
+ permit tcp any any established
+ permit icmp any any echo-reply
+ permit icmp 172.16.20.0 0.0.0.63 172.16.20.0 0.0.0.63
+ deny ip any 172.16.32.64 0.0.0.63
+ permit icmp 172.16.20.0 0.0.0.63 172.16.20.64 0.0.0.63
+ permit tcp 172.16.20.0 0.0.0.63 172.16.20.64 0.0.0.63 eq 80
+ permit icmp 172.16.20.0 0.0.0.63 172.16.10.128 0.0.0.127
+ permit tcp 172.16.20.0 0.0.0.63 172.16.10.128 0.0.0.127 eq 80
+ permit icmp 172.16.20.0 0.0.0.63 172.16.10.0 0.0.0.127
+ permit tcp 172.16.20.0 0.0.0.63 172.16.10.0 0.0.0.127 eq 80
+ permit tcp 172.16.20.0 0.0.0.63 172.16.10.0 0.0.0.127 eq 443
+ permit icmp 172.16.20.0 0.0.0.63 172.16.32.0 0.0.0.191
+ permit tcp 172.16.20.0 0.0.0.63 172.16.32.0 0.0.0.191 eq 80
+ permit tcp 172.16.20.0 0.0.0.63 172.16.32.0 0.0.0.191 eq 443
+exit
+ip access-list extended ACL-FACTURACION
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit udp any host 224.0.0.2 eq 1985
+ permit tcp any any established
+ permit icmp any any echo-reply
+ permit icmp 172.16.20.64 0.0.0.63 172.16.20.64 0.0.0.63
+ deny ip any 172.16.32.64 0.0.0.63
+ deny ip any 172.16.10.128 0.0.0.127
+ permit icmp 172.16.20.64 0.0.0.63 172.16.20.0 0.0.0.63
+ permit tcp 172.16.20.64 0.0.0.63 172.16.20.0 0.0.0.63 eq 80
+ permit icmp 172.16.20.64 0.0.0.63 172.16.10.0 0.0.0.127
+ permit tcp 172.16.20.64 0.0.0.63 172.16.10.0 0.0.0.127 eq 80
+ permit tcp 172.16.20.64 0.0.0.63 172.16.10.0 0.0.0.127 eq 443
+ permit icmp 172.16.20.64 0.0.0.63 172.16.32.0 0.0.0.191
+ permit tcp 172.16.20.64 0.0.0.63 172.16.32.0 0.0.0.191 eq 80
+ permit tcp 172.16.20.64 0.0.0.63 172.16.32.0 0.0.0.191 eq 443
+exit
+interface vlan 30
+ ip access-group ACL-VENTAS in
+exit
+interface vlan 40
+ ip access-group ACL-FACTURACION in
+end
+write memory
+```
+
+AND-DIST2:
+```
+enable
+configure terminal
+ip access-list extended ACL-VENTAS
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit udp any host 224.0.0.2 eq 1985
+ permit tcp any any established
+ permit icmp any any echo-reply
+ permit icmp 172.16.20.0 0.0.0.63 172.16.20.0 0.0.0.63
+ deny ip any 172.16.32.64 0.0.0.63
+ permit icmp 172.16.20.0 0.0.0.63 172.16.20.64 0.0.0.63
+ permit tcp 172.16.20.0 0.0.0.63 172.16.20.64 0.0.0.63 eq 80
+ permit icmp 172.16.20.0 0.0.0.63 172.16.10.128 0.0.0.127
+ permit tcp 172.16.20.0 0.0.0.63 172.16.10.128 0.0.0.127 eq 80
+ permit icmp 172.16.20.0 0.0.0.63 172.16.10.0 0.0.0.127
+ permit tcp 172.16.20.0 0.0.0.63 172.16.10.0 0.0.0.127 eq 80
+ permit tcp 172.16.20.0 0.0.0.63 172.16.10.0 0.0.0.127 eq 443
+ permit icmp 172.16.20.0 0.0.0.63 172.16.32.0 0.0.0.191
+ permit tcp 172.16.20.0 0.0.0.63 172.16.32.0 0.0.0.191 eq 80
+ permit tcp 172.16.20.0 0.0.0.63 172.16.32.0 0.0.0.191 eq 443
+exit
+ip access-list extended ACL-FACTURACION
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit udp any host 224.0.0.2 eq 1985
+ permit tcp any any established
+ permit icmp any any echo-reply
+ permit icmp 172.16.20.64 0.0.0.63 172.16.20.64 0.0.0.63
+ deny ip any 172.16.32.64 0.0.0.63
+ deny ip any 172.16.10.128 0.0.0.127
+ permit icmp 172.16.20.64 0.0.0.63 172.16.20.0 0.0.0.63
+ permit tcp 172.16.20.64 0.0.0.63 172.16.20.0 0.0.0.63 eq 80
+ permit icmp 172.16.20.64 0.0.0.63 172.16.10.0 0.0.0.127
+ permit tcp 172.16.20.64 0.0.0.63 172.16.10.0 0.0.0.127 eq 80
+ permit tcp 172.16.20.64 0.0.0.63 172.16.10.0 0.0.0.127 eq 443
+ permit icmp 172.16.20.64 0.0.0.63 172.16.32.0 0.0.0.191
+ permit tcp 172.16.20.64 0.0.0.63 172.16.32.0 0.0.0.191 eq 80
+ permit tcp 172.16.20.64 0.0.0.63 172.16.32.0 0.0.0.191 eq 443
+exit
+interface vlan 30
+ ip access-group ACL-VENTAS in
+exit
+interface vlan 40
+ ip access-group ACL-FACTURACION in
+end
+write memory
+```
+
+---
+
+#### Fase 11 · MoonLink
+
+`ACL-SOPORTE` usa como origen `172.16.32.0 0.0.0.191`, por lo que sirve sin cambios para Soporte (`MOO-SP1`) y para la red Wi-Fi (`MOO-SP3`).
+
+MOO-SP1:
+```
+enable
+configure terminal
+ip access-list extended ACL-SOPORTE
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit tcp any any established
+ permit icmp any any echo-reply
+ deny ip any 172.16.32.64 0.0.0.63
+ permit icmp 172.16.32.0 0.0.0.191 any
+ permit tcp 172.16.32.0 0.0.0.191 any eq 80
+ permit tcp 172.16.32.0 0.0.0.191 any eq 443
+exit
+interface vlan 60
+ ip access-group ACL-SOPORTE in
+end
+write memory
+```
+
+MOO-SP3:
+```
+enable
+configure terminal
+ip access-list extended ACL-SOPORTE
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit tcp any any established
+ permit icmp any any echo-reply
+ deny ip any 172.16.32.64 0.0.0.63
+ permit icmp 172.16.32.0 0.0.0.191 any
+ permit tcp 172.16.32.0 0.0.0.191 any eq 80
+ permit tcp 172.16.32.0 0.0.0.191 any eq 443
+exit
+interface vlan 80
+ ip access-group ACL-SOPORTE in
+end
+write memory
+```
+
+MOO-SP2:
+```
+enable
+configure terminal
+ip access-list extended ACL-SEGURIDAD
+ permit udp any eq 68 any eq 67
+ permit udp any host 172.16.10.125 eq 53
+ permit tcp any any established
+ permit icmp any any echo-reply
+ permit icmp 172.16.32.64 0.0.0.63 any
+ permit tcp 172.16.32.64 0.0.0.63 any eq 80
+ permit tcp 172.16.32.64 0.0.0.63 any eq 443
+exit
+interface vlan 70
+ ip access-group ACL-SEGURIDAD in
+end
+write memory
+```
+
+---
+
+#### Verificación de la fase 11 · Aplicación de las ACLs
+
+En cada uno de los siete switches (en `AND-DIST1` y `AND-DIST2` se revisan las dos SVIs):
+
+```
+show access-lists
+show ip interface vlan 10
+```
+
+El segundo comando se adapta a la VLAN de cada switch (10, 20, 30 y 40, 60, 70 u 80). Debe mostrar `Inbound access list is` seguido del nombre de la ACL.
+
+En `AND-DIST1` y `AND-DIST2`:
+```
+show standby brief
+```
+
+Debe mantener a `AND-DIST1` como `Active` en las VLAN 30 y 50, y a `AND-DIST2` como `Active` en la VLAN 40, con el otro en `Standby`. Si las dos distribuciones aparecen como `Active` en la misma VLAN, falta la regla de HSRP en la ACL de esa VLAN.
+
+---
+
+#### Verificación de la fase 11 · Matriz de comunicación
+
+Se usa un equipo representativo por departamento, con la IP que muestre `ipconfig /all` en cada uno:
+
+| Departamento | Equipo |
+|:--|:--|
+| Administración | `FIB-PC1` |
+| Atención al Cliente | `FIB-PC4` |
+| Ventas | `AND-PC1` |
+| Facturación | `AND-PC4` |
+| Soporte | `MOO-PC1` |
+| Seguridad | `MOO-PC3` |
+| Soporte Wi-Fi | `MOO-LAPTOP` |
+
+Desde cada equipo, en **Desktop**, **Command Prompt**, se hace `ping` a los otros seis. Resultado esperado (filas: origen; columnas: destino):
+
+| Origen | Administración | Atención | Ventas | Facturación | Soporte | Seguridad | Wi-Fi |
+|:--|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| Administración | — | Éxito | Éxito | Éxito | Éxito | Bloqueado | Éxito |
+| Atención al Cliente | Éxito | — | Éxito | Bloqueado | Éxito | Bloqueado | Éxito |
+| Ventas | Éxito | Éxito | — | Éxito | Éxito | Bloqueado | Éxito |
+| Facturación | Éxito | Bloqueado | Éxito | — | Éxito | Bloqueado | Éxito |
+| Soporte | Éxito | Éxito | Éxito | Éxito | — | Bloqueado | Éxito |
+| Seguridad | Éxito | Éxito | Éxito | Éxito | Éxito | — | Éxito |
+| Soporte Wi-Fi | Éxito | Éxito | Éxito | Éxito | Éxito | Bloqueado | — |
+
+Un ping bloqueado devuelve `Destination host unreachable` o `Request timed out`. Los pings con éxito pueden perder el primer paquete por el ARP.
+
+Además, se comprueban los servicios con las ACLs activas:
+
+En cada uno de los siete equipos representativos:
+```
+nslookup www.proyecto2_201504070.com
+```
+
+En el **Web Browser** de cada uno de los siete equipos:
+```
+http://www.proyecto2_201504070.com
+https://www.proyecto2_201504070.com
+```
+
+En un equipo por departamento:
+```
+ipconfig /renew
+ipconfig /all
+```
+
+Resultado esperado:
+
+| Comprobación | Resultado esperado |
+|:--|:--|
+| `nslookup` desde los siete equipos | Devuelve `172.16.10.125` |
+| Navegador desde los siete equipos | La página carga por HTTP y por HTTPS, también desde Seguridad |
+| `ipconfig /renew` | El equipo conserva su IP del pool, lo que confirma que DHCP funciona con las ACLs |
+
+Con las ACLs activas se bloquean también los pings a direcciones que no son de departamentos, como las IPs de enlace (`192.168.70.x` y las de tránsito) o el servidor `AND-DHCP`. No es un fallo: la tabla 4.2 no los incluye.
+
+---
+
+#### Fase 11 · Capturas de pantalla de pruebas de funcionalidad
+
+1. **ACLs aplicadas.** En los siete switches se ejecutó `show running-config | include access-group`.
+
+<div align="center">
+  <img src="img/fase11_1.avif" alt="Se adjuntan las pantallas, con la línea `ip access-group` y el nombre de la ACL de cada SVI" width="100%">
+  <p>Se adjuntan las pantallas, con la línea `ip access-group` y el nombre de la ACL de cada SVI</p>
+</div>
+
+2. **HSRP con las ACLs activas.** En `AND-DIST1` y `AND-DIST2` se ejecutó el comando `show standby brief`.
+
+<div align="center">
+  <img src="img/fase11_2.avif" alt="Se aprecia que cada VLAN mantiene un solo equipo en `Active` y el otro en `Standby`" width="100%">
+  <p>Se aprecia que cada VLAN mantiene un solo equipo en `Active` y el otro en `Standby`</p>
+</div>
+
+3. **Pings permitidos.** Desde `FIB-PC1`, `FIB-PC4`, `AND-PC1`, `AND-PC4`, `MOO-PC1` y `MOO-LAPTOP` se ejecutaron los pings con resultado exitoso de la matriz.
+
+Tabla de pruebas realizadas y resultados:
+
+| Origen | Destino | Exitoso/Fallido |
+| --- | --- | --- |
+| FIB-PC1 (Administración) | FIB-PC4 | Succesful |
+| FIB-PC1 (Administración) | AND-PC1 | Succesful |
+| FIB-PC1 (Administración) | AND-PC4 | Succesful |
+| FIB-PC1 (Administración) | MOO-PC1 | Succesful |
+| FIB-PC1 (Administración) | MOO-LAPTOP | Succesful |
+| FIB-PC4 (Atención) | FIB-PC1 | Succesful |
+| FIB-PC4 (Atención) | AND-PC1 | Succesful |
+| FIB-PC4 (Atención) | MOO-PC1 | Succesful |
+| FIB-PC4 (Atención) | MOO-LAPTOP | Succesful |
+| AND-PC1 (Ventas) | FIB-PC1 | Succesful |
+| AND-PC1 (Ventas) | FIB-PC4 | Succesful |
+| AND-PC1 (Ventas) | AND-PC4 | Succesful |
+| AND-PC1 (Ventas) | MOO-PC1 | Succesful |
+| AND-PC1 (Ventas) | MOO-LAPTOP | Succesful |
+| AND-PC4 (Facturación) | FIB-PC1 | Succesful |
+| AND-PC4 (Facturación) | AND-PC1 | Succesful |
+| AND-PC4 (Facturación) | MOO-PC1 | Succesful |
+| AND-PC4 (Facturación) | MOO-LAPTOP | Succesful |
+| MOO-PC1 (Soporte) | FIB-PC1 | Succesful |
+| MOO-PC1 (Soporte) | FIB-PC4 | Succesful |
+| MOO-PC1 (Soporte) | AND-PC1 | Succesful |
+| MOO-PC1 (Soporte) | AND-PC4 | Succesful |
+| MOO-PC1 (Soporte) | MOO-LAPTOP | Succesful |
+| MOO-LAPTOP (Wi-Fi) | FIB-PC1 | Succesful |
+| MOO-LAPTOP (Wi-Fi) | FIB-PC4 | Succesful |
+| MOO-LAPTOP (Wi-Fi) | AND-PC1 | Succesful |
+| MOO-LAPTOP (Wi-Fi) | AND-PC4 | Succesful |
+| MOO-LAPTOP (Wi-Fi) | MOO-PC1 | Succesful |
+
+<div align="center">
+  <img src="img/fase11_3.avif" alt="Se muestran las respuestas de los pings entre los departamentos con comunicación permitida" width="100%">
+  <p>Se muestran las respuestas de los pings entre los departamentos con comunicación permitida</p>
+</div>
+
+4. **Pings bloqueados hacia Seguridad.** Desde `FIB-PC1`, `FIB-PC4`, `AND-PC1`, `AND-PC4`, `MOO-PC1` y `MOO-LAPTOP` se ejecutó un ping hacia `MOO-PC3`.
+
+| Origen | Destino | Exitoso/Fallido |
+| --- | --- | --- |
+| FIB-PC1 (Administración) | MOO-PC3 | Failed |
+| FIB-PC4 (Atención) | MOO-PC3 | Failed |
+| AND-PC1 (Ventas) | MOO-PC3 | Failed |
+| MOO-PC1 (Soporte) | MOO-PC3 | Failed |
+| MOO-LAPTOP (Wi-Fi) | MOO-PC3 | Failed |
+
+<div align="center">
+  <img src="img/fase11_4.avif" alt="Se muestra que ningún departamento puede iniciar comunicación hacia Seguridad" width="100%">
+  <p>Se muestra que ningún departamento puede iniciar comunicación hacia Seguridad</p>
+</div>
+
+5. **Pings bloqueados entre Atención al Cliente y Facturación.** Desde `FIB-PC4` hacia `AND-PC4`, y desde `AND-PC4` hacia `FIB-PC4`.
+
+| Origen | Destino | Exitoso/Fallido |
+| --- | --- | --- |
+| FIB-PC4 (Atención) | AND-PC4 | Failed |
+| AND-PC4 (Facturación) | FIB-PC4 | Failed |
+
+<div align="center">
+  <img src="img/fase11_5.avif" alt="Se muestra el bloqueo en ambos sentidos" width="100%">
+  <p>Se muestra el bloqueo en ambos sentidos</p>
+</div>
+
+6. **Seguridad inicia comunicación.** Desde `MOO-PC3` se ejecutaron los pings hacia los otros seis departamentos.
+
+| Origen | Destino | Exitoso/Fallido |
+| --- | --- | --- |
+| MOO-PC3 (Seguridad) | FIB-PC1 | Succesful |
+| MOO-PC3 (Seguridad) | FIB-PC4 | Succesful |
+| MOO-PC3 (Seguridad) | AND-PC1 | Succesful |
+| MOO-PC3 (Seguridad) | AND-PC4 | Succesful |
+| MOO-PC3 (Seguridad) | MOO-PC1 | Succesful |
+| MOO-PC3 (Seguridad) | MOO-LAPTOP | Succesful |
+
+<div align="center">
+  <img src="img/fase11_6.avif" alt="Se muestran las respuestas exitosas hacia todos los departamentos" width="100%">
+  <p>Se muestran las respuestas exitosas hacia todos los departamentos</p>
+</div>
+
+7. **Servicios con las ACLs activas.** Desde los equipos FIB-PC1 (Administración), FIB-PC4 (Atención), AND-PC1 (Ventas), AND-PC4 (Facturación), MOO-PC1 (Soporte), MOO-LAPTOP (Wi-Fi), MOO-PC3 (Seguridad) se ejecutó `nslookup www.proyecto2_201504070.com`.
+
+<div align="center">
+  <img src="img/fase11_7.avif" alt="Se muestra que la resolución y la página web siguen funcionando desde todos los departamentos" width="100%">
+  <p>Se muestra que la resolución y la página web siguen funcionando desde todos los departamentos</p>
+</div>
+
 
 ---
