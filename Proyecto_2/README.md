@@ -466,6 +466,10 @@ flowchart TB
 
 <img src="img/topología.avif" alt="" width="100%">
 
+### Topología con etiquetas de puertos en cisco packet tracer
+
+<img src="img/topología_puertos.avif" alt="" width="100%">
+
 ### Identificación de componentes
 
 | Nombre | Tipo de dispositivo | ISP | Función |
