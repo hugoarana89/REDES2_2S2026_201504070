@@ -3835,4 +3835,6 @@ Al finalizar los cuatro escenarios, se detuvo la captura y se guardó desde **Fi
   <p>Cuadro de diálogo Save As de Wireshark con el nombre captura_wireshark_201504070.pcapng</p>
 </div>
 
+> Este archivo se guardó en la carpeta: /Wireshark/captura_wireshark_201504070.pcapng
+
 ---
