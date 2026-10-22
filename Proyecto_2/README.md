@@ -43,18 +43,6 @@ El proyecto consiste en diseñar e implementar una infraestructura nacional de t
 
 Todo se implementa en Cisco Packet Tracer (archivo `Proyecto2_201504070.pkt`) y todas las configuraciones se aplican desde la CLI, excepto en el router inalámbrico, que solo ofrece interfaz gráfica.
 
-## Estado del proyecto
-
-| Etapa | Estado |
-|:--|:--|
-| Diseño, subneteo y plan de direccionamiento | Terminado |
-| Cableado físico en Packet Tracer (39 cables, módulos de fibra instalados) | Terminado |
-| Configuración de dispositivos | Pendiente (se hará por fases, ver [Plan de configuración](#plan-de-configuración)) |
-| Servicios, ACLs y pruebas | Pendiente |
-| Wireshark, manual técnico y presentación | Pendiente |
-
----
-
 ## Subneteo y plan de direccionamiento
 
 ### Variables derivadas del carné
@@ -644,9 +632,7 @@ La configuración se hace por fases, una a la vez, y cada fase se verifica antes
 | 9 | eBGP: IPs de fibra, vecinos, anuncio de los /24, `router-id` y redistribución BGP ↔ OSPF/EIGRP | `show ip bgp summary`, `show ip route`, ping core a core | Hecho |
 | 10 | Servicios entre ISPs: `ip helper-address` en FibraNet y MoonLink, y DNS en los pools | Todos los hosts reciben IP por DHCP; el dominio carga desde cualquier dispositivo; ping entre ISPs | hecho |
 | 11 | ACLs extendidas por departamento (orden de reglas y tabla 4.2) | Matriz de ping y acceso web entre todos los pares de departamentos | Hecho |
-| 13 | Captura en Wireshark desde una VM (TCP handshake, DNS, HTTP/HTTPS, ICMP) | Archivo `.pcapng` abre en Wireshark | Pendiente |
-| 14 | Práctica del modo simulación (DHCP DORA, DNS, HTTP/HTTPS, OSPF/EIGRP y BGP) | Explicar capa por capa un paquete elegido al azar | Pendiente |
-| 15 | Manual técnico, presentación ejecutiva y commits en el repositorio | Entregables completos antes del 23/10/2026 | Pendiente |
+| 13 | Captura en Wireshark desde una VM (TCP handshake, DNS, HTTP/HTTPS, ICMP) | Archivo `.pcapng` abre en Wireshark | Hecho |
 
 ### Notas sobre eBGP en Packet Tracer
 
@@ -1317,7 +1303,7 @@ Resultado esperado:
 1. **IP estática de `FIB-SRV`.** En `FIB-SRV`, en la pestaña **Config**, se abrió **FastEthernet0** y la sección **Settings** (global).
 
 <div align="center">
-  <img src="img/fase3_1.avif" alt="Captura pendiente: Se aprecian la dirección `172.16.10.125`, la máscara, el gateway `172.16.10.1` y el servidor DNS" width="100%">
+  <img src="img/fase3_1.avif" alt="Se aprecian la dirección `172.16.10.125`, la máscara, el gateway `172.16.10.1` y el servidor DNS" width="100%">
   <p>Se aprecian la dirección `172.16.10.125`, la máscara, el gateway `172.16.10.1` y el servidor DNS</p>
 </div>
 
@@ -1366,7 +1352,7 @@ Resultado esperado:
 8. **Acceso por HTTPS.** En el mismo navegador se abrió `https://www.proyecto2_201504070.com`.
 
 <div align="center">
-  <img src="img/fase3_8.avif" alt="Captura pendiente: Se muestra la misma página cargada por HTTPS en ambos PCs" width="100%">
+  <img src="img/fase3_8.avif" alt="Se muestra la misma página cargada por HTTPS en ambos PCs" width="100%">
   <p>Se muestra la misma página cargada por HTTPS en ambos PCs</p>
 </div>
 
@@ -2438,7 +2424,7 @@ Si `Vlan80` queda en `down`, se revisa que el puerto `Gi1/0/1` de `MOO-SP3` teng
 1. **Port-channels en el hub.** En `MOO-HUB` se ejecutó el comando `show etherchannel summary`.
 
 <div align="center">
-  <img src="img/fase7_1.avif" alt="Captura pendiente: Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gi1/0/1-4` marcados con `P`" width="100%">
+  <img src="img/fase7_1.avif" alt="Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gi1/0/1-4` marcados con `P`" width="100%">
   <p>Se aprecian `Po1` y `Po2` en `SU`, con los puertos `Gi1/0/1-4` marcados con `P`</p>
 </div>
 
@@ -2601,7 +2587,7 @@ Resultado esperado:
 4. **Asociación de la laptop.** En `MOO-LAPTOP`, en **Desktop**, **PC Wireless**, pestaña **Connect**.
 
 <div align="center">
-  <img src="img/fase8_4.avif" alt="Captura pendiente: Se muestra la laptop conectada a la red `MoonLink-WiFi`" width="100%">
+  <img src="img/fase8_4.avif" alt="Se muestra la laptop conectada a la red `MoonLink-WiFi`" width="100%">
   <p>Se muestra la laptop conectada a la red `MoonLink-WiFi`</p>
 </div>
 
@@ -2622,7 +2608,7 @@ Resultado esperado:
 7. **Comprobación desde `MOO-SP3`.** En `MOO-SP3` se ejecutaron `ping 172.16.32.130`, `ping 172.16.32.150` y `show ip arp`.
 
 <div align="center">
-  <img src="img/fase8_7.avif" alt="Captura pendiente: Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`" width="100%">
+  <img src="img/fase8_7.avif" alt="Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`" width="100%">
   <p>Se aprecian las respuestas y las entradas ARP del router inalámbrico y de la laptop en `Vlan80`</p>
 </div>
 
@@ -3570,5 +3556,283 @@ Tabla de pruebas realizadas y resultados:
   <p>Se muestra que la resolución y la página web siguen funcionando desde todos los departamentos</p>
 </div>
 
+
+---
+
+## Fase 12 · Análisis de tráfico con Wireshark
+
+En esta sección se documenta la captura y el análisis de tráfico controlado generado desde una máquina virtual. Se realizaron cuatro escenarios (three-way handshake TCP, resolución DNS, comparación HTTP contra HTTPS e ICMP) dentro de una única sesión de captura, la cual se guardó como `captura_wireshark_201504070.pcapng`.
+
+### 1. Preparación de la máquina virtual
+
+Se utilizó VirtualBox para crear una máquina virtual con Lubuntu, una distribución ligera que consume poco espacio en disco. La máquina se configuró con 4 GB de RAM, 2 procesadores y un disco virtual de 15 GB.
+
+<div align="center">
+  <img src="img/fase12_1.avif" alt="Configuración de la máquina virtual en VirtualBox con 4 GB de RAM, 2 procesadores y disco de 15 GB" width="100%">
+  <p>Configuración de la máquina virtual en VirtualBox con 4 GB de RAM, 2 procesadores y disco de 15 GB</p>
+</div>
+
+### 2. Configuración de red en modo NAT
+
+El adaptador de red de la máquina virtual se configuró en modo **NAT**, de modo que el tráfico capturado proviene únicamente de la máquina virtual y no del equipo anfitrión. Esta configuración se realizó desde VirtualBox, en **Configuración → Red → Adaptador 1**, con la máquina apagada.
+
+<div align="center">
+  <img src="img/fase12_2.avif" alt="Adaptador 1 de la máquina virtual habilitado y conectado a NAT" width="100%">
+  <p>Adaptador 1 de la máquina virtual habilitado y conectado a NAT</p>
+</div>
+
+### 3. Instalación de las herramientas
+
+Dentro de Lubuntu, se instaló Wireshark junto con las utilidades necesarias para generar el tráfico de prueba:
+
+```bash
+sudo apt update
+sudo apt install wireshark curl dnsutils -y
+sudo usermod -aG wireshark $USER
+sudo chown root:wireshark /usr/bin/dumpcap
+sudo chmod 750 /usr/bin/dumpcap
+sudo setcap cap_net_raw,cap_net_admin+eip /usr/bin/dumpcap
+```
+
+> La maquina virtual se debe de reiniciar por completo para que funcione Wireshark.
+
+Durante la instalación se permitió que los usuarios sin privilegios capturen paquetes y, para aplicar el cambio de grupo, se reinició la máquina virtual. Posteriormente se verificó la versión instalada y la interfaz de red disponible:
+
+```bash
+wireshark --version
+ip a
+```
+
+<div align="center">
+  <img src="img/fase12_3.avif" alt="Versión de Wireshark instalada y dirección IP de la interfaz de red de la máquina virtual" width="100%">
+  <p>Versión de Wireshark instalada y dirección IP de la interfaz de red de la máquina virtual</p>
+</div>
+
+### 4. Inicio de la captura
+
+Se abrió Wireshark, se seleccionó la interfaz de red activa de la máquina virtual (normalmente `enp0s3`) e inició la captura. Los cuatro escenarios se ejecutaron en orden, uno después de otro, sobre la misma sesión, y se utilizaron filtros de visualización para analizar cada uno por separado.
+
+<div align="center">
+  <img src="img/fase12_4_1.avif" alt="Interfaz gráfica de wireshare" width="100%">
+  <p>Interfaz gráfica de wireshare</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_4_2".avif" alt="Wireshark capturando sobre la interfaz de red de la máquina virtual" width="100%">
+  <p>Wireshark capturando sobre la interfaz de red de la máquina virtual</p>
+</div>
+
+### 5. Escenario 1: Three-way handshake TCP
+
+Con la captura en ejecución, se generó una conexión TCP hacia un servidor web mediante el siguiente comando:
+
+```bash
+curl -v http://example.com
+```
+
+En Wireshark se aplicó el filtro `tcp.port == 80` y se identificaron los tres primeros paquetes de la conexión.
+
+<div align="center">
+  <img src="img/fase12_5.avif" alt="Ejecución del comando curl hacia http://example.com en la terminal" width="100%">
+  <p>Ejecución del comando curl hacia http://example.com en la terminal</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_6.avif" alt="Lista de paquetes filtrada con tcp.port == 80 mostrando SYN, SYN-ACK y ACK" width="100%">
+  <p>Lista de paquetes filtrada con tcp.port == 80 mostrando SYN, SYN-ACK y ACK</p>
+</div>
+
+El primer paquete es el **SYN**, enviado por la máquina virtual para iniciar la conexión. Tiene únicamente el flag SYN activo (`0x002`) y Wireshark lo muestra con número de secuencia relativo `0`.
+
+<div align="center">
+  <img src="img/fase12_7.avif" alt="Paquete SYN con el detalle de la capa TCP, flags y número de secuencia" width="100%">
+  <p>Paquete SYN con el detalle de la capa TCP, flags y número de secuencia</p>
+</div>
+
+El segundo paquete es el **SYN-ACK**, enviado por el servidor. Tiene activos los flags SYN y ACK (`0x012`), su número de secuencia relativo es `0` y su número de confirmación es `1`, es decir, el número de secuencia del SYN más uno.
+
+<div align="center">
+  <img src="img/fase12_8.avif" alt="Paquete SYN-ACK con el detalle de la capa TCP, flags, número de secuencia y de confirmación" width="100%">
+  <p>Paquete SYN-ACK con el detalle de la capa TCP, flags, número de secuencia y de confirmación</p>
+</div>
+
+El tercer paquete es el **ACK**, enviado por la máquina virtual para completar el handshake. Tiene activo únicamente el flag ACK (`0x010`), con número de secuencia relativo `1` y número de confirmación `1`. A partir de este momento la conexión queda establecida y puede transmitirse información.
+
+<div align="center">
+  <img src="img/fase12_9.avif" alt="Paquete ACK con el detalle de la capa TCP, flags, número de secuencia y de confirmación" width="100%">
+  <p>Paquete ACK con el detalle de la capa TCP, flags, número de secuencia y de confirmación</p>
+</div>
+
+> Wireshark muestra por defecto números de secuencia relativos. El valor absoluto puede consultarse en el campo `Sequence Number (raw)` de la capa TCP.
+
+### 6. Escenario 2: Resolución DNS
+
+Se ejecutó una consulta DNS dirigida directamente al servidor público de Google (`8.8.8.8`), de modo que la consulta saliera a la red y no se resolviera desde la caché local:
+
+```bash
+dig @8.8.8.8 example.com A
+```
+
+En Wireshark se aplicó el filtro `dns`.
+
+<div align="center">
+  <img src="img/fase12_10.avif" alt="Ejecución del comando dig hacia 8.8.8.8 en la terminal" width="100%">
+  <p>Ejecución del comando dig hacia 8.8.8.8 en la terminal</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_11.avif" alt="Lista de paquetes filtrada con dns mostrando la consulta y la respuesta" width="100%">
+  <p>Lista de paquetes filtrada con dns mostrando la consulta y la respuesta</p>
+</div>
+
+En la **consulta** se observa que el protocolo de transporte es **UDP**, con puerto de destino **53** (el puerto del servicio DNS) y un puerto de origen efímero asignado por el sistema operativo. El tipo de registro solicitado es **A** (resolución de un nombre a una dirección IPv4), con clase IN.
+
+<div align="center">
+  <img src="img/fase12_12.avif" alt="Detalle de la consulta DNS con el puerto UDP de destino 53 y el tipo de registro A" width="100%">
+  <p>Detalle de la consulta DNS con el puerto UDP de destino 53 y el tipo de registro A</p>
+</div>
+
+En la **respuesta** el puerto de origen es 53 y el de destino es el puerto efímero de la consulta. En la sección de respuestas (`Answers`) se identifica el registro A devuelto con la dirección IP del dominio y su **TTL**, que indica durante cuántos segundos la respuesta puede almacenarse en caché antes de volver a consultarse.
+
+<div align="center">
+  <img src="img/fase12_13.avif" alt="Detalle de la respuesta DNS con el registro A, la dirección IP y el TTL" width="100%">
+  <p>Detalle de la respuesta DNS con el registro A, la dirección IP y el TTL</p>
+</div>
+
+### 7. Escenario 3: Petición HTTP frente a HTTPS
+
+#### Petición HTTP
+
+Se realizó una petición HTTP sin cifrado:
+
+```bash
+curl -v http://example.com
+```
+
+Se aplicó el filtro `http` en Wireshark. Los paquetes muestran el método `GET` y la respuesta del servidor `HTTP/1.1 200 OK` con su contenido en texto plano.
+
+<div align="center">
+  <img src="img/fase12_14.avif" alt="Ejecución de la petición HTTP con curl en la terminal" width="100%">
+  <p>Ejecución de la petición HTTP con curl en la terminal</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_15.avif" alt="Lista de paquetes filtrada con http mostrando la petición GET y la respuesta 200 OK" width="100%">
+  <p>Lista de paquetes filtrada con http mostrando la petición GET y la respuesta 200 OK</p>
+</div>
+
+Mediante la opción **Analyze → Follow → TCP Stream** se reconstruyó la conversación completa. Tanto la petición como el HTML devuelto son legibles, ya que HTTP no cifra la información. Cualquier equipo ubicado en la ruta del tráfico podría leerla.
+
+<div align="center">
+  <img src="img/fase12_16_1.avif" alt="Seleccionando la opción Analyze → Follow → TCP Stream sonre la petición Get" width="100%">
+  <p>Seleccionando la opción Analyze → Follow → TCP Stream sonre la petición Get</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_16_2.avif" alt="Follow TCP Stream de la petición HTTP con el contenido legible en texto plano" width="100%">
+  <p>Follow TCP Stream de la petición HTTP con el contenido legible en texto plano</p>
+</div>
+
+#### Petición HTTPS
+
+Posteriormente se realizó la misma petición mediante HTTPS:
+
+```bash
+curl -v https://example.com
+```
+
+Se aplicó el filtro `tls` en Wireshark.
+
+<div align="center">
+  <img src="img/fase12_17.avif" alt="Ejecución de la petición HTTPS con curl en la terminal" width="100%">
+  <p>Ejecución de la petición HTTPS con curl en la terminal</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_18.avif" alt="Lista de paquetes filtrada con tls mostrando el handshake TLS" width="100%">
+  <p>Lista de paquetes filtrada con tls mostrando el handshake TLS</p>
+</div>
+
+El handshake TLS inicia con el **Client Hello**, enviado por la máquina virtual. Este paquete contiene las versiones de TLS soportadas, la lista de cipher suites ofrecidas y la extensión **SNI** (Server Name Indication), que indica el nombre del servidor al que se desea conectar. El SNI viaja sin cifrar.
+
+<div align="center">
+  <img src="img/fase12_19.avif" alt="Paquete Client Hello con las versiones TLS, cipher suites y la extensión SNI" width="100%">
+  <p>Paquete Client Hello con las versiones TLS, cipher suites y la extensión SNI</p>
+</div>
+
+El servidor responde con el **Server Hello**, en el que selecciona la versión de TLS y la cipher suite que se utilizarán y envía su parte del intercambio de claves. Luego se observan paquetes `Change Cipher Spec`. En TLS 1.3, los mensajes posteriores del handshake (como el certificado del servidor) ya viajan cifrados.
+
+<div align="center">
+  <img src="img/fase12_20.avif" alt="Paquete Server Hello con la versión TLS y la cipher suite seleccionada" width="100%">
+  <p>Paquete Server Hello con la versión TLS y la cipher suite seleccionada</p>
+</div>
+
+Una vez finalizado el handshake, los datos de la aplicación aparecen como **Application Data**.
+
+<div align="center">
+  <img src="img/fase12_21.avif" alt="Paquetes Application Data con el contenido cifrado" width="100%">
+  <p>Paquetes Application Data con el contenido cifrado</p>
+</div>
+
+Al aplicar **Follow TCP Stream** sobre la conexión HTTPS, el contenido resulta ilegible.
+
+<div align="center">
+  <img src="img/fase12_22.avif" alt="Follow TCP Stream de la conexión HTTPS con el contenido ilegible" width="100%">
+  <p>Follow TCP Stream de la conexión HTTPS con el contenido ilegible</p>
+</div>
+
+### Comparación y explicación del cifrado
+
+| Aspecto | HTTP | HTTPS |
+|---|---|---|
+| Puerto de destino | 80 | 443 |
+| Handshake adicional | No | Sí, handshake TLS |
+| Contenido de la petición y respuesta | Visible en texto plano | Cifrado (`Application Data`) |
+| Información visible para un observador | Todo el mensaje | Direcciones IP, puertos y el nombre del servidor (SNI) |
+
+El contenido de la petición HTTPS aparece cifrado porque HTTP viaja encapsulado dentro de TLS. Durante el handshake, cliente y servidor negocian una cipher suite y acuerdan, mediante un intercambio de claves, una clave de sesión que solo ambos conocen. Con esa clave, los datos se cifran de forma simétrica antes de enviarse. Wireshark captura los paquetes pero no posee la clave de sesión, por lo que únicamente puede mostrar los bytes cifrados como `Application Data`.
+
+### 8. Escenario 4: ICMP
+
+Se ejecutó un ping hacia una dirección externa limitado a cuatro paquetes:
+
+```bash
+ping -c 4 8.8.8.8
+```
+
+En Wireshark se aplicó el filtro `icmp`.
+
+<div align="center">
+  <img src="img/fase12_23.avif" alt="Ejecución del comando ping hacia 8.8.8.8 en la terminal" width="100%">
+  <p>Ejecución del comando ping hacia 8.8.8.8 en la terminal</p>
+</div>
+
+<div align="center">
+  <img src="img/fase12_24.avif" alt="Lista de paquetes filtrada con icmp mostrando los Echo Request y Echo Reply" width="100%">
+  <p>Lista de paquetes filtrada con icmp mostrando los Echo Request y Echo Reply</p>
+</div>
+
+El **Echo Request** corresponde al mensaje ICMP tipo **8**, código 0, enviado por la máquina virtual hacia `8.8.8.8`. Incluye un identificador y un número de secuencia que se incrementa con cada paquete.
+
+<div align="center">
+  <img src="img/fase12_25.avif" alt="Detalle del Echo Request con tipo 8, identificador y número de secuencia" width="100%">
+  <p>Detalle del Echo Request con tipo 8, identificador y número de secuencia</p>
+</div>
+
+El **Echo Reply** corresponde al mensaje ICMP tipo **0**, código 0, enviado por `8.8.8.8` hacia la máquina virtual. Mantiene el mismo identificador y número de secuencia del request al que responde, y Wireshark los enlaza mediante los campos `Response frame` y `Request frame`.
+
+<div align="center">
+  <img src="img/fase12_26.avif" alt="Detalle del Echo Reply con tipo 0, identificador y número de secuencia" width="100%">
+  <p>Detalle del Echo Reply con tipo 0, identificador y número de secuencia</p>
+</div>
+
+### 9. Guardado y entrega de la captura
+
+Al finalizar los cuatro escenarios, se detuvo la captura y se guardó desde **File → Save As** en formato `pcapng` con el nombre `captura_wireshark_201504070.pcapng`.
+
+<div align="center">
+  <img src="img/fase12_27.avif" alt="Cuadro de diálogo Save As de Wireshark con el nombre captura_wireshark_201504070.pcapng" width="100%">
+  <p>Cuadro de diálogo Save As de Wireshark con el nombre captura_wireshark_201504070.pcapng</p>
+</div>
 
 ---
